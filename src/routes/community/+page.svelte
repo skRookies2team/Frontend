@@ -1,60 +1,84 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
+  import { api, PostType, type PostResponseDto } from '$lib/api';
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   
   let activeTab = $state<'popular' | 'recent' | 'following'>('popular');
-  
-  const posts = [
-    {
-      id: 1,
-      author: { name: '김작가', avatar: '👨‍💼' },
-      title: '처음으로 인터랙티브 소설을 완성했어요!',
-      content: '3개월 동안 작업한 판타지 소설을 드디어 완성했습니다. 독자분들의 반응이 정말 좋아서 감격스러워요. 인터랙티브 요소를 추가하니 몰입도가 훨씬 높아진 것 같아요...',
-      likes: 142,
-      comments: 23,
-      timeAgo: '2시간 전',
-      tags: ['완성', '판타지', '첫작품']
-    },
-    {
-      id: 2,
-      author: { name: '이소설', avatar: '👩‍🎨' },
-      title: 'AI 이미지 생성 팁 공유합니다',
-      content: 'DALL-E를 활용해서 작품 이미지를 생성할 때 유용한 프롬프트 작성법을 공유합니다. 특히 캐릭터 일관성을 유지하는 방법이 중요한데요...',
-      likes: 89,
-      comments: 15,
-      timeAgo: '5시간 전',
-      tags: ['팁', 'AI', '이미지']
-    },
-    {
-      id: 3,
-      author: { name: '박스토리', avatar: '👨‍🏫' },
-      title: '추리 소설 선택지 설계 노하우',
-      content: '독자들이 진짜 추리하는 느낌을 받을 수 있도록 선택지를 설계하는 방법에 대해 이야기해보려고 합니다. 먼저 단서 배치가 중요한데...',
-      likes: 201,
-      comments: 34,
-      timeAgo: '1일 전',
-      tags: ['노하우', '추리', '선택지']
-    },
-    {
-      id: 4,
-      author: { name: '최문학', avatar: '👩‍💻' },
-      title: 'SF 설정 작업할 때 참고하면 좋은 자료들',
-      content: '하드 SF를 쓰시는 분들께 도움이 될 만한 과학 자료와 레퍼런스를 모아봤습니다. NASA 공개 자료부터 시작해서...',
-      likes: 156,
-      comments: 28,
-      timeAgo: '1일 전',
-      tags: ['SF', '자료', '레퍼런스']
-    },
-    {
-      id: 5,
-      author: { name: '정이야기', avatar: '👨‍🎨' },
-      title: '캐릭터 깊이 있게 만드는 방법',
-      content: '평면적인 캐릭터가 아닌 입체적인 캐릭터를 만들기 위한 팁을 공유합니다. 성격 시트 작성부터 대화 패턴까지...',
-      likes: 178,
-      comments: 42,
-      timeAgo: '2일 전',
-      tags: ['캐릭터', '팁', '창작']
+  let posts: PostResponseDto[] = $state([]);
+  let loading = $state(true);
+  let currentPage = $state(0);
+  let totalPages = $state(0);
+  let error = $state('');
+
+  onMount(() => {
+    loadPosts();
+  });
+
+  async function loadPosts() {
+    loading = true;
+    error = '';
+    
+    try {
+      // Load posts based on active tab
+      const response = await api.post.getPosts({
+        page: currentPage,
+        size: 10,
+        sort: activeTab === 'recent' ? ['createdAt,desc'] : ['likeCount,desc']
+      });
+      
+      posts = response.content;
+      totalPages = response.totalPages;
+    } catch (err) {
+      console.error('Failed to load posts:', err);
+      error = '게시글을 불러오는데 실패했습니다.';
+    } finally {
+      loading = false;
     }
-  ];
+  }
+
+  async function handleLike(postId: number) {
+    try {
+      await api.post.toggleLike(postId);
+      // Reload posts to update like count
+      await loadPosts();
+    } catch (err) {
+      console.error('Failed to toggle like:', err);
+    }
+  }
+
+  async function handleBookmark(postId: number) {
+    try {
+      await api.post.toggleBookmark(postId);
+      // Reload posts to update bookmark status
+      await loadPosts();
+    } catch (err) {
+      console.error('Failed to toggle bookmark:', err);
+    }
+  }
+
+  function goToPost(postId: number) {
+    goto(`/community/${postId}`);
+  }
+
+  function formatTimeAgo(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 60) return `${diffMins}분 전`;
+    if (diffHours < 24) return `${diffHours}시간 전`;
+    return `${diffDays}일 전`;
+  }
+
+  // Watch tab changes
+  $effect(() => {
+    activeTab;
+    loadPosts();
+  });
 </script>
 
 <div class="community-page">
@@ -101,40 +125,72 @@
     <div class="content-grid">
       <!-- Posts -->
       <div class="posts-section">
-        {#each posts as post}
-          <article class="post-card">
-            <div class="post-header">
-              <div class="author-info">
-                <div class="author-avatar">{post.author.avatar}</div>
-                <div>
-                  <div class="author-name">{post.author.name}</div>
-                  <div class="post-time">{post.timeAgo}</div>
+        {#if loading}
+          <div class="loading-message">로딩중...</div>
+        {:else if error}
+          <div class="error-message">{error}</div>
+        {:else if posts.length === 0}
+          <div class="empty-message">게시글이 없습니다.</div>
+        {:else}
+          {#each posts as post}
+            <article class="post-card" onclick={() => goToPost(post.postId)}>
+              <div class="post-header">
+                <div class="author-info">
+                  <div class="author-avatar">👤</div>
+                  <div>
+                    <div class="author-name">{post.authorNickname}</div>
+                    <div class="post-time">{formatTimeAgo(post.createdAt)}</div>
+                  </div>
                 </div>
+                <span class="post-type">{post.type}</span>
               </div>
+              
+              <h2 class="post-title">{post.title}</h2>
+              <p class="post-content">{post.content.substring(0, 200)}{post.content.length > 200 ? '...' : ''}</p>
+              
+              <div class="post-footer">
+                <button 
+                  class="action-btn" 
+                  class:active={post.isLiked}
+                  onclick={(e) => { e.stopPropagation(); handleLike(post.postId); }}
+                >
+                  {post.isLiked ? '❤️' : '🤍'} {post.likeCount}
+                </button>
+                <button class="action-btn" onclick={(e) => { e.stopPropagation(); goToPost(post.postId); }}>
+                  💬 {post.commentCount}
+                </button>
+                <button 
+                  class="action-btn"
+                  class:active={post.isBookmarked}
+                  onclick={(e) => { e.stopPropagation(); handleBookmark(post.postId); }}
+                >
+                  {post.isBookmarked ? '⭐' : '☆'} 북마크
+                </button>
+                <span class="view-count">👁️ {post.viewCount}</span>
+              </div>
+            </article>
+          {/each}
+
+          {#if totalPages > 1}
+            <div class="pagination">
+              <Button 
+                variant="outline" 
+                disabled={currentPage === 0}
+                onclick={() => { currentPage--; loadPosts(); }}
+              >
+                이전
+              </Button>
+              <span>{currentPage + 1} / {totalPages}</span>
+              <Button 
+                variant="outline" 
+                disabled={currentPage >= totalPages - 1}
+                onclick={() => { currentPage++; loadPosts(); }}
+              >
+                다음
+              </Button>
             </div>
-            
-            <h2 class="post-title">{post.title}</h2>
-            <p class="post-content">{post.content}</p>
-            
-            <div class="post-tags">
-              {#each post.tags as tag}
-                <span class="tag">#{tag}</span>
-              {/each}
-            </div>
-            
-            <div class="post-footer">
-              <button class="action-btn">
-                ❤️ {post.likes}
-              </button>
-              <button class="action-btn">
-                💬 {post.comments}
-              </button>
-              <button class="action-btn">
-                🔗 공유
-              </button>
-            </div>
-          </article>
-        {/each}
+          {/if}
+        {/if}
       </div>
 
       <!-- Sidebar -->
@@ -264,10 +320,12 @@
     border-radius: var(--radius-lg);
     padding: 1.5rem;
     transition: all 0.2s;
+    cursor: pointer;
   }
 
   .post-card:hover {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
   }
 
   .post-header {
@@ -344,6 +402,47 @@
 
   .action-btn:hover {
     color: hsl(var(--primary));
+  }
+
+  .action-btn.active {
+    color: hsl(var(--primary));
+  }
+
+  .post-type {
+    padding: 0.25rem 0.75rem;
+    background: hsl(var(--muted));
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .view-count {
+    margin-left: auto;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.875rem;
+  }
+
+  .loading-message,
+  .error-message,
+  .empty-message {
+    padding: 3rem;
+    text-align: center;
+    color: hsl(var(--muted-foreground));
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg);
+  }
+
+  .error-message {
+    color: hsl(0 84.2% 60.2%);
+  }
+
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    padding: 2rem;
   }
 
   /* Sidebar */

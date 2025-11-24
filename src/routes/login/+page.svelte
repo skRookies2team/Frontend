@@ -1,19 +1,50 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
+  import { api, ApiError } from '$lib/api';
+  import { goto } from '$app/navigation';
   
+  let username = $state('');
   let email = $state('');
   let password = $state('');
   let isSignUp = $state(false);
-  let name = $state('');
+  let nickname = $state('');
+  let loading = $state(false);
+  let errorMessage = $state('');
   
-  function handleSubmit(e: Event) {
+  async function handleSubmit(e: Event) {
     e.preventDefault();
-    if (isSignUp) {
-      console.log('Sign up:', { name, email, password });
-      alert('회원가입 기능은 준비 중입니다!');
-    } else {
-      console.log('Sign in:', { email, password });
-      alert('로그인 기능은 준비 중입니다!');
+    errorMessage = '';
+    loading = true;
+    
+    try {
+      if (isSignUp) {
+        // 회원가입
+        await api.auth.signUp({
+          username,
+          email,
+          password,
+          nickname
+        });
+        alert('회원가입이 완료되었습니다!');
+        goto('/');
+      } else {
+        // 로그인
+        await api.auth.login({
+          username,
+          password
+        });
+        alert('로그인 되었습니다!');
+        goto('/');
+      }
+    } catch (error) {
+      if (error instanceof ApiError) {
+        errorMessage = error.data?.message || '요청에 실패했습니다.';
+      } else {
+        errorMessage = '네트워크 오류가 발생했습니다.';
+      }
+      console.error('Auth error:', error);
+    } finally {
+      loading = false;
     }
   }
   
@@ -76,31 +107,50 @@
 
         <!-- Form -->
         <form class="login-form" onsubmit={handleSubmit}>
+          {#if errorMessage}
+            <div class="error-message">{errorMessage}</div>
+          {/if}
+
+          <div class="form-group">
+            <label for="username" class="form-label">사용자명</label>
+            <input 
+              id="username"
+              type="text"
+              class="form-input"
+              placeholder="사용자명을 입력하세요"
+              bind:value={username}
+              disabled={loading}
+              required
+            />
+          </div>
+
           {#if isSignUp}
             <div class="form-group">
-              <label for="name" class="form-label">이름</label>
+              <label for="nickname" class="form-label">닉네임</label>
               <input 
-                id="name"
+                id="nickname"
                 type="text"
                 class="form-input"
-                placeholder="이름을 입력하세요"
-                bind:value={name}
+                placeholder="닉네임을 입력하세요"
+                bind:value={nickname}
+                disabled={loading}
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="email" class="form-label">이메일</label>
+              <input 
+                id="email"
+                type="email"
+                class="form-input"
+                placeholder="email@example.com"
+                bind:value={email}
+                disabled={loading}
                 required
               />
             </div>
           {/if}
-
-          <div class="form-group">
-            <label for="email" class="form-label">이메일</label>
-            <input 
-              id="email"
-              type="email"
-              class="form-input"
-              placeholder="email@example.com"
-              bind:value={email}
-              required
-            />
-          </div>
 
           <div class="form-group">
             <label for="password" class="form-label">비밀번호</label>
@@ -110,6 +160,7 @@
               class="form-input"
               placeholder="비밀번호를 입력하세요"
               bind:value={password}
+              disabled={loading}
               required
             />
           </div>
@@ -124,8 +175,8 @@
             </div>
           {/if}
 
-          <Button type="submit" class="submit-btn w-full" size="lg">
-            {isSignUp ? '회원가입' : '로그인'}
+          <Button type="submit" class="submit-btn w-full" size="lg" disabled={loading}>
+            {loading ? '처리중...' : isSignUp ? '회원가입' : '로그인'}
           </Button>
         </form>
 
@@ -434,6 +485,16 @@
     text-align: center;
     font-size: 0.875rem;
     color: hsl(var(--muted-foreground));
+  }
+
+  .error-message {
+    padding: 0.75rem;
+    background: hsl(0 84.2% 60.2% / 0.1);
+    border: 1px solid hsl(0 84.2% 60.2%);
+    border-radius: var(--radius-md);
+    color: hsl(0 84.2% 60.2%);
+    font-size: 0.875rem;
+    text-align: center;
   }
 
   @media (max-width: 968px) {

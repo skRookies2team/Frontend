@@ -80,7 +80,7 @@
           전 세계 독자들과 공유하세요.
         </p>
         <div class="hero-actions">
-          <Button size="lg" class="hero-btn-primary">
+          <Button size="lg" class="hero-btn-primary" onclick={() => window.location.href = '/creator/wizard'}>
             📝 작품 만들기
           </Button>
           <Button size="lg" variant="outline" class="hero-btn-secondary">
@@ -148,7 +148,7 @@
       <p class="cta-description">
         무료로 가입하고 첫 작품을 만들어보세요
       </p>
-      <Button size="lg" class="cta-button">
+      <Button size="lg" class="cta-button" onclick={() => window.location.href = '/creator/wizard'}>
         무료로 시작하기 →
       </Button>
     </div>

@@ -2,6 +2,7 @@
 	"/": [],
 	"/community": [],
 	"/creator": [],
+	"/creator/wizard": [],
 	"/login": [],
 	"/play/[novel_id]": [],
 	"/profile": []

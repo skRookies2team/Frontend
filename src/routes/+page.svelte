@@ -1,32 +1,45 @@
 <script lang="ts">
-  import { novels, categories } from '$lib/data/novel-configs';
+  import { api, type StoryData } from '$lib/api';
   import { Button } from '$lib/components/ui/button';
-  import type { NovelConfig } from '$lib/types/game-state';
+  import { onMount } from 'svelte';
   
+  let stories: StoryData[] = $state([]);
+  let loading = $state(true);
+  let error = $state('');
   let selectedCategory = $state('전체');
   let searchQuery = $state('');
   
-  let filteredNovels = $derived.by(() => {
-    let result = novels;
-    
-    if (selectedCategory !== '전체') {
-      result = result.filter(novel => novel.category === selectedCategory);
+  // 카테고리는 임시로 하드코딩 (백엔드에 카테고리 정보가 없으므로)
+  const categories = ['전체', '고전문학', 'SF', '추리', '판타지', '로맨스'];
+  
+  onMount(async () => {
+    try {
+      stories = await api.game.getAllStories();
+    } catch (err) {
+      console.error('Failed to load stories:', err);
+      error = '스토리를 불러오는데 실패했습니다.';
+    } finally {
+      loading = false;
     }
+  });
+  
+  let filteredStories = $derived.by(() => {
+    let result = stories;
     
+    // 검색 필터
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(novel => 
-        novel.title.toLowerCase().includes(query) ||
-        novel.description.toLowerCase().includes(query) ||
-        novel.author.toLowerCase().includes(query)
+      result = result.filter(story => 
+        story.title.toLowerCase().includes(query) ||
+        story.description.toLowerCase().includes(query)
       );
     }
     
     return result;
   });
   
-  function startNovel(novel: NovelConfig) {
-    window.location.href = `/play/${novel.id}`;
+  function startStory(story: StoryData) {
+    window.location.href = `/play/${story.id}`;
   }
 </script>
 
@@ -69,52 +82,66 @@
     </aside>
     
     <div class="content-area">
-      <!-- Story Cards Grid -->
-      <div class="cards-grid">
-        {#each filteredNovels as novel}
-          <article class="story-card">
-            <div class="card-image">
-              <img src={novel.thumbnail || "/placeholder.svg"} alt={novel.title} />
-              <div class="card-badge">{novel.category}</div>
-            </div>
-            <div class="card-content">
-              <h3 class="card-title">{novel.title}</h3>
-              <p class="card-author">{novel.author}</p>
-              <p class="card-description">{novel.description}</p>
-              <div class="card-meta">
-                <span class="meta-item">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12z" stroke="currentColor" stroke-width="1.5"/>
-                    <path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                  </svg>
-                  {novel.difficulty}
-                </span>
-                <span class="meta-item">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 1l2 4 4.5.5-3.25 3 .75 4.5L8 11l-4 2 .75-4.5L1.5 5.5 6 5z" fill="currentColor"/>
-                  </svg>
-                  {novel.characters.length}명
-                </span>
-              </div>
-              <Button 
-                class="w-full" 
-                variant="outline"
-                onclick={() => startNovel(novel)}
-                aria-label={`${novel.title} 시작하기`}
-              >
-                시작하기
-              </Button>
-            </div>
-          </article>
-        {/each}
-      </div>
-      
-      {#if filteredNovels.length === 0}
-        <div class="empty-state">
-          <p class="empty-icon">📚</p>
-          <h3 class="empty-title">검색 결과가 없습니다</h3>
-          <p class="empty-text">다른 키워드로 검색해보세요</p>
+      {#if loading}
+        <div class="loading-state">
+          <p>로딩중...</p>
         </div>
+      {:else if error}
+        <div class="error-state">
+          <p class="error-icon">⚠️</p>
+          <h3 class="error-title">{error}</h3>
+          <Button onclick={() => window.location.reload()}>다시 시도</Button>
+        </div>
+      {:else}
+        <!-- Story Cards Grid -->
+        <div class="cards-grid">
+          {#each filteredStories as story}
+            <article class="story-card">
+              <div class="card-image">
+                <img src="/placeholder.svg" alt={story.title} />
+                <div class="card-badge">스토리</div>
+              </div>
+              <div class="card-content">
+                <h3 class="card-title">{story.title}</h3>
+                <p class="card-description">{story.description || '설명이 없습니다'}</p>
+                <div class="card-meta">
+                  <span class="meta-item">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path d="M2 3h12v10H2z" stroke="currentColor" stroke-width="1.5"/>
+                      <path d="M6 7h4M6 10h4" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    {story.totalEpisodes}화
+                  </span>
+                  <span class="meta-item">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path d="M8 1l2 4 4.5.5-3.25 3 .75 4.5L8 11l-4 2 .75-4.5L1.5 5.5 6 5z" fill="currentColor"/>
+                    </svg>
+                    {story.totalNodes}개 노드
+                  </span>
+                </div>
+                <div class="card-date">
+                  {new Date(story.createdAt).toLocaleDateString('ko-KR')}
+                </div>
+                <Button 
+                  class="w-full" 
+                  variant="outline"
+                  onclick={() => startStory(story)}
+                  aria-label={`${story.title} 시작하기`}
+                >
+                  시작하기
+                </Button>
+              </div>
+            </article>
+          {/each}
+        </div>
+        
+        {#if filteredStories.length === 0}
+          <div class="empty-state">
+            <p class="empty-icon">📚</p>
+            <h3 class="empty-title">스토리가 없습니다</h3>
+            <p class="empty-text">새로운 스토리를 만들어보세요</p>
+          </div>
+        {/if}
       {/if}
     </div>
   </main>
@@ -348,6 +375,34 @@
 
   .empty-text {
     color: hsl(var(--muted-foreground));
+  }
+
+  .loading-state,
+  .error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    text-align: center;
+    gap: 1rem;
+  }
+
+  .error-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .error-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: hsl(0 84.2% 60.2%);
+  }
+
+  .card-date {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 0.75rem;
   }
 
   @media (max-width: 1200px) {

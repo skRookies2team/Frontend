@@ -1,17 +1,52 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
+  import { api, type UserProfileDto, type GameHistoryDto, type AchievementDto } from '$lib/api';
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   
   let activeTab = $state<'stories' | 'created' | 'stats'>('stories');
+  let loading = $state(true);
+  let profile: UserProfileDto | null = $state(null);
+  let gameHistory: GameHistoryDto[] = $state([]);
+  let achievements: AchievementDto[] = $state([]);
+  let error = $state('');
   
-  const user = {
-    name: '김독자',
-    email: 'reader@ifstory.com',
-    avatar: '👤',
-    joinDate: '2024년 1월',
-    level: 15,
-    points: 2450
-  };
-  
+  onMount(async () => {
+    // Check if user is authenticated
+    if (!api.auth.isAuthenticated()) {
+      goto('/login');
+      return;
+    }
+
+    try {
+      // Load profile data
+      const [profileData, historyData, achievementsData] = await Promise.all([
+        api.user.getMyProfile(),
+        api.user.getGameHistory(),
+        api.user.getAchievements()
+      ]);
+      
+      profile = profileData;
+      gameHistory = historyData;
+      achievements = achievementsData;
+    } catch (err) {
+      console.error('Failed to load profile:', err);
+      error = '프로필을 불러오는데 실패했습니다.';
+    } finally {
+      loading = false;
+    }
+  });
+
+  async function handleLogout() {
+    try {
+      await api.auth.logout();
+      goto('/login');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  }
+
+  // Mock data for stories (will be replaced with actual API)
   const playedStories = [
     {
       id: 1,
@@ -55,18 +90,19 @@
       status: 'draft'
     }
   ];
-  
-  const achievements = [
-    { icon: '🏆', title: '첫 완독', description: '첫 작품 완독' },
-    { icon: '✍️', title: '작가 데뷔', description: '첫 작품 발행' },
-    { icon: '💯', title: '백점만점', description: '100개 선택 달성' },
-    { icon: '⭐', title: '인기작가', description: '1000 좋아요 달성' },
-    { icon: '📚', title: '다독가', description: '10개 작품 완독' },
-    { icon: '🎨', title: '창의력', description: '5개 작품 제작' }
-  ];
 </script>
 
 <div class="profile-page">
+  {#if loading}
+    <div class="loading-container">
+      <p>로딩중...</p>
+    </div>
+  {:else if error}
+    <div class="error-container">
+      <p>{error}</p>
+      <Button onclick={() => window.location.reload()}>다시 시도</Button>
+    </div>
+  {:else if profile}
   <div class="profile-container">
     <!-- Profile Header -->
     <header class="profile-header">
@@ -74,30 +110,41 @@
       <div class="header-content">
         <div class="profile-main">
           <div class="avatar-section">
-            <div class="avatar-large">{user.avatar}</div>
+            <div class="avatar-large">
+              {#if profile.profileImageUrl}
+                <img src={profile.profileImageUrl} alt={profile.nickname} />
+              {:else}
+                👤
+              {/if}
+            </div>
             <Button variant="outline" size="sm" class="edit-avatar-btn">
               편집
             </Button>
           </div>
           <div class="profile-info">
-            <h1 class="user-name">{user.name}</h1>
-            <p class="user-email">{user.email}</p>
-            <p class="user-meta">가입일: {user.joinDate}</p>
+            <h1 class="user-name">{profile.nickname}</h1>
+            <p class="user-email">{profile.email}</p>
+            <p class="user-bio">{profile.bio || '자기소개가 없습니다.'}</p>
+            <p class="user-meta">가입일: {new Date(profile.createdAt).toLocaleDateString('ko-KR')}</p>
             <div class="user-stats">
               <div class="stat-badge">
-                <span class="stat-label">레벨</span>
-                <span class="stat-value">{user.level}</span>
+                <span class="stat-label">플레이</span>
+                <span class="stat-value">{profile.totalPlayCount}</span>
               </div>
               <div class="stat-badge">
-                <span class="stat-label">포인트</span>
-                <span class="stat-value">{user.points}</span>
+                <span class="stat-label">완료</span>
+                <span class="stat-value">{profile.completedStoryCount}</span>
+              </div>
+              <div class="stat-badge">
+                <span class="stat-label">엔딩</span>
+                <span class="stat-value">{profile.unlockedEndingCount}</span>
               </div>
             </div>
           </div>
         </div>
         <div class="header-actions">
           <Button variant="outline">설정</Button>
-          <Button variant="outline">공유</Button>
+          <Button variant="outline" onclick={handleLogout}>로그아웃</Button>
         </div>
       </div>
     </header>
@@ -185,12 +232,18 @@
             <h2 class="section-title">업적</h2>
             <div class="achievements-grid">
               {#each achievements as achievement}
-                <div class="achievement-card">
-                  <div class="achievement-icon">{achievement.icon}</div>
+                <div class="achievement-card" class:unlocked={achievement.isUnlocked}>
+                  <div class="achievement-icon">{achievement.iconUrl || '🏆'}</div>
                   <div class="achievement-info">
-                    <h4 class="achievement-title">{achievement.title}</h4>
+                    <h4 class="achievement-title">{achievement.name}</h4>
                     <p class="achievement-description">{achievement.description}</p>
+                    <div class="achievement-progress">
+                      {achievement.currentValue} / {achievement.targetValue}
+                    </div>
                   </div>
+                  {#if achievement.isUnlocked}
+                    <div class="unlocked-badge">✓</div>
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -201,20 +254,24 @@
             <h2 class="section-title">통계</h2>
             <div class="stats-grid">
               <div class="stat-card">
-                <div class="stat-number">12</div>
+                <div class="stat-number">{profile.totalPlayCount}</div>
                 <div class="stat-label">플레이한 스토리</div>
               </div>
               <div class="stat-card">
-                <div class="stat-number">3</div>
-                <div class="stat-label">완독한 작품</div>
+                <div class="stat-number">{profile.completedStoryCount}</div>
+                <div class="stat-label">완료한 스토리</div>
               </div>
               <div class="stat-card">
-                <div class="stat-number">2</div>
-                <div class="stat-label">작성한 스토리</div>
+                <div class="stat-number">{profile.unlockedEndingCount}</div>
+                <div class="stat-label">달성한 엔딩</div>
               </div>
               <div class="stat-card">
-                <div class="stat-number">1,634</div>
-                <div class="stat-label">총 조회수</div>
+                <div class="stat-number">{profile.unlockedAchievementCount}</div>
+                <div class="stat-label">달성 업적</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-number">{profile.achievementRate.toFixed(1)}%</div>
+                <div class="stat-label">업적 달성률</div>
               </div>
             </div>
           </div>
@@ -222,6 +279,7 @@
       {/if}
     </div>
   </div>
+  {/if}
 </div>
 
 <style>
@@ -531,11 +589,19 @@
   }
 
   .achievement-card {
+    position: relative;
     display: flex;
     gap: 1rem;
     padding: 1rem;
     background: hsl(var(--muted));
     border-radius: var(--radius-md);
+    opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+
+  .achievement-card.unlocked {
+    opacity: 1;
+    background: hsl(var(--primary) / 0.1);
   }
 
   .achievement-icon {
@@ -551,6 +617,50 @@
   .achievement-description {
     font-size: 0.875rem;
     color: hsl(var(--muted-foreground));
+  }
+
+  .achievement-progress {
+    font-size: 0.75rem;
+    color: hsl(var(--primary));
+    font-weight: 600;
+    margin-top: 0.25rem;
+  }
+
+  .unlocked-badge {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 24px;
+    height: 24px;
+    background: hsl(var(--primary));
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+  }
+
+  .loading-container,
+  .error-container {
+    min-height: calc(100vh - 60px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .user-bio {
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 0.5rem;
+    font-style: italic;
+  }
+
+  .avatar-large img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .stats-grid {
