@@ -57,17 +57,24 @@ export class AuthApi {
    * User logout
    */
   async logout(): Promise<string> {
-    const response = await httpClient.post<string>('/api/auth/logout');
-    
-    // Clear tokens
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('userId');
-      localStorage.removeItem('username');
+    try {
+      // Try to call backend logout endpoint
+      const response = await httpClient.post<string>('/api/auth/logout');
+      return response;
+    } catch (error) {
+      console.error('Backend logout failed:', error);
+      // Continue to clear tokens even if backend call fails
+    } finally {
+      // Always clear tokens from localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('username');
+      }
     }
     
-    return response;
+    return 'Logged out';
   }
 
   /**

@@ -10,6 +10,13 @@
   let currentPage = $state(0);
   let totalPages = $state(0);
   let error = $state('');
+  
+  // 글쓰기 모달
+  let showWriteModal = $state(false);
+  let postTitle = $state('');
+  let postContent = $state('');
+  let postType = $state<PostType>(PostType.GENERAL);
+  let submitting = $state(false);
 
   onMount(() => {
     loadPosts();
@@ -73,6 +80,48 @@
     if (diffHours < 24) return `${diffHours}시간 전`;
     return `${diffDays}일 전`;
   }
+  
+  function openWriteModal() {
+    // 로그인 체크
+    if (!api.auth.isAuthenticated()) {
+      alert('로그인이 필요합니다.');
+      goto('/login');
+      return;
+    }
+    showWriteModal = true;
+  }
+  
+  function closeWriteModal() {
+    showWriteModal = false;
+    postTitle = '';
+    postContent = '';
+    postType = PostType.GENERAL;
+  }
+  
+  async function submitPost() {
+    if (!postTitle.trim() || !postContent.trim()) {
+      alert('제목과 내용을 입력해주세요.');
+      return;
+    }
+    
+    submitting = true;
+    try {
+      await api.post.createPost({
+        title: postTitle,
+        content: postContent,
+        type: postType
+      });
+      
+      alert('게시글이 작성되었습니다!');
+      closeWriteModal();
+      await loadPosts();
+    } catch (err) {
+      console.error('게시글 작성 실패:', err);
+      alert('게시글 작성에 실패했습니다.');
+    } finally {
+      submitting = false;
+    }
+  }
 
   // Watch tab changes
   $effect(() => {
@@ -90,7 +139,7 @@
           <h1 class="page-title">커뮤니티</h1>
           <p class="page-description">창작자들과 소통하고 영감을 나누세요</p>
         </div>
-        <Button size="lg">
+        <Button size="lg" onclick={openWriteModal}>
           ✍️ 글쓰기
         </Button>
       </div>
@@ -237,6 +286,68 @@
     </div>
   </div>
 </div>
+
+<!-- 글쓰기 모달 -->
+{#if showWriteModal}
+  <div class="modal-overlay" onclick={closeWriteModal}>
+    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
+      <div class="modal-header">
+        <h2 class="modal-title">✍️ 새 글 쓰기</h2>
+        <button class="modal-close" onclick={closeWriteModal}>✕</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="post-type" class="form-label">카테고리</label>
+          <select 
+            id="post-type" 
+            class="form-select" 
+            bind:value={postType}
+            style="background-color: #1a1a1a; color: #ffffff;"
+          >
+            <option value={PostType.GENERAL} style="background-color: #1a1a1a; color: #ffffff;">일반</option>
+            <option value={PostType.STORY} style="background-color: #1a1a1a; color: #ffffff;">스토리</option>
+            <option value={PostType.QUESTION} style="background-color: #1a1a1a; color: #ffffff;">질문</option>
+            <option value={PostType.GUIDE} style="background-color: #1a1a1a; color: #ffffff;">가이드</option>
+            <option value={PostType.NOTICE} style="background-color: #1a1a1a; color: #ffffff;">공지</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="post-title" class="form-label">제목</label>
+          <input 
+            id="post-title"
+            type="text" 
+            class="form-input" 
+            placeholder="제목을 입력하세요"
+            bind:value={postTitle}
+            maxlength="200"
+          />
+        </div>
+        
+        <div class="form-group">
+          <label for="post-content" class="form-label">내용</label>
+          <textarea 
+            id="post-content"
+            class="form-textarea" 
+            placeholder="내용을 입력하세요"
+            bind:value={postContent}
+            rows="10"
+          ></textarea>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <Button variant="outline" onclick={closeWriteModal} disabled={submitting}>
+          취소
+        </Button>
+        <Button onclick={submitPost} disabled={submitting}>
+          {submitting ? '작성 중...' : '작성하기'}
+        </Button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .community-page {
@@ -542,6 +653,152 @@
     }
   }
 
+  /* 모달 */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+  }
+
+  .modal-content {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    position: relative;
+    z-index: 1001;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .modal-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: hsl(var(--muted-foreground));
+    cursor: pointer;
+    padding: 0.5rem;
+    line-height: 1;
+  }
+
+  .modal-close:hover {
+    color: hsl(var(--foreground));
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: hsl(var(--foreground));
+  }
+
+  .form-select,
+  .form-input {
+    width: 100%;
+    padding: 0.75rem;
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+    color: hsl(var(--foreground));
+    font-size: 1rem;
+  }
+
+  /* Select 드롭다운 옵션 스타일 - 강제 적용 */
+  .form-select {
+    background-color: #1a1a1a !important;
+    color: #ffffff !important;
+  }
+
+  .form-select option {
+    background-color: #1a1a1a !important;
+    color: #ffffff !important;
+    padding: 0.5rem;
+  }
+
+  /* 라이트 모드용 미디어 쿼리 */
+  @media (prefers-color-scheme: light) {
+    .form-select {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+    }
+
+    .form-select option {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+    }
+  }
+
+  .form-select:focus,
+  .form-input:focus,
+  .form-textarea:focus {
+    outline: none;
+    border-color: hsl(var(--primary));
+  }
+
+  .form-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+    color: hsl(var(--foreground));
+    font-size: 1rem;
+    resize: vertical;
+    min-height: 200px;
+    font-family: inherit;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    border-top: 1px solid hsl(var(--border));
+  }
+
+  @media (max-width: 1024px) {
+    .content-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+      display: none;
+    }
+  }
+
   @media (max-width: 768px) {
     .page-title {
       font-size: 2rem;
@@ -551,6 +808,10 @@
       flex-direction: column;
       align-items: flex-start;
       gap: 1rem;
+    }
+    
+    .modal-content {
+      max-width: 100%;
     }
   }
 </style>

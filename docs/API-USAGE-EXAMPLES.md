@@ -701,3 +701,5 @@ const profile = await fetchWithRetry(() => api.user.getMyProfile());
 3. **타입 안전성**: TypeScript를 사용하여 모든 요청/응답이 타입 체크됩니다.
 4. **에러 처리**: `ApiError` 클래스를 사용하여 일관된 에러 처리가 가능합니다.
 
+
+

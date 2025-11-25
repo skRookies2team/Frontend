@@ -26,9 +26,9 @@ export class CommentApi {
   /**
    * Update comment
    */
-  async updateComment(postId: number, commentId: number, content: string): Promise<CommentResponseDto> {
+  async updateComment(commentId: number, content: string): Promise<CommentResponseDto> {
     return httpClient.put<CommentResponseDto>(
-      `/api/posts/${postId}/comments/${commentId}`,
+      `/api/comments/${commentId}`,
       content
     );
   }
@@ -36,17 +36,19 @@ export class CommentApi {
   /**
    * Delete comment
    */
-  async deleteComment(postId: number, commentId: number): Promise<string> {
-    return httpClient.delete<string>(`/api/posts/${postId}/comments/${commentId}`);
+  async deleteComment(commentId: number): Promise<string> {
+    return httpClient.delete<string>(`/api/comments/${commentId}`);
   }
 
   /**
    * Toggle like on comment
    */
-  async toggleLike(postId: number, commentId: number): Promise<string> {
-    return httpClient.post<string>(`/api/posts/${postId}/comments/${commentId}/like`);
+  async toggleLike(commentId: number): Promise<string> {
+    return httpClient.post<string>(`/api/comments/${commentId}/like`);
   }
 }
 
 export const commentApi = new CommentApi();
+
+
 

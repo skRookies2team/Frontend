@@ -1,8 +1,39 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { page } from '$app/stores';
+  import { api } from '$lib/api';
+  import { onMount } from 'svelte';
   
   let searchQuery = $state('');
+  let isLoggedIn = $state(false);
+  let username = $state('');
+  
+  // 로그인 상태 확인
+  function checkAuth() {
+    isLoggedIn = api.auth.isAuthenticated();
+    if (isLoggedIn) {
+      username = api.auth.getCurrentUsername() || '사용자';
+    }
+  }
+  
+  onMount(() => {
+    checkAuth();
+    
+    // 페이지 변경 시마다 체크
+    const interval = setInterval(checkAuth, 1000);
+    return () => clearInterval(interval);
+  });
+  
+  async function handleLogout() {
+    try {
+      await api.auth.logout();
+      isLoggedIn = false;
+      username = '';
+      window.location.href = '/';
+    } catch (error) {
+      console.error('로그아웃 실패:', error);
+    }
+  }
   
   $effect(() => {
     // You can handle search query changes here
@@ -35,14 +66,28 @@
           </svg>
         </button>
       </div>
-      <Button variant="default" size="sm" onclick={() => window.location.href = '/login'} aria-label="로그인">로그인</Button>
-      <button type="button" class="profile-btn" onclick={() => window.location.href = '/profile'} aria-label="프로필">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-          <circle cx="12" cy="10" r="3" fill="currentColor"/>
-          <path d="M6.5 18.5c1-2 3-3.5 5.5-3.5s4.5 1.5 5.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-      </button>
+      
+      {#if isLoggedIn}
+        <!-- 로그인 상태 -->
+        <div class="user-info">
+          <span class="username">{username}</span>
+        </div>
+        <Button variant="outline" size="sm" onclick={handleLogout} aria-label="로그아웃">
+          로그아웃
+        </Button>
+        <button type="button" class="profile-btn" onclick={() => window.location.href = '/profile'} aria-label="프로필">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+            <circle cx="12" cy="10" r="3" fill="currentColor"/>
+            <path d="M6.5 18.5c1-2 3-3.5 5.5-3.5s4.5 1.5 5.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      {:else}
+        <!-- 로그인 안 된 상태 -->
+        <Button variant="default" size="sm" onclick={() => window.location.href = '/login'} aria-label="로그인">
+          로그인
+        </Button>
+      {/if}
     </div>
   </div>
 </nav>
@@ -170,6 +215,20 @@
 
   .profile-btn:hover {
     color: hsl(var(--primary));
+  }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background: hsl(var(--muted));
+    border-radius: var(--radius-full);
+  }
+
+  .username {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: hsl(var(--foreground));
   }
 
   @media (max-width: 768px) {

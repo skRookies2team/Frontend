@@ -77,7 +77,7 @@ class HttpClient {
     if (requiresAuth) {
       const token = this.getAccessToken();
       if (token) {
-        requestHeaders['Authorization'] = `Bearer ${token}`;
+        (requestHeaders as Record<string, string>)['Authorization'] = `Bearer ${token}`;
       }
     }
 

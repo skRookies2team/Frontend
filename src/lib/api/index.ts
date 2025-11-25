@@ -11,6 +11,7 @@ import { commentApi, CommentApi } from './comment-api';
 import { reviewApi, ReviewApi } from './review-api';
 import { gameApi, GameApi } from './game-api';
 import { healthApi, HealthApi } from './health-api';
+import { storyApi, StoryApi } from './story-api';
 import { httpClient, ApiError } from './http-client';
 
 // Re-export all API clients
@@ -21,6 +22,7 @@ export { commentApi, CommentApi };
 export { reviewApi, ReviewApi };
 export { gameApi, GameApi };
 export { healthApi, HealthApi };
+export { storyApi, StoryApi };
 
 // Export HTTP client and error class
 export { httpClient, ApiError };
@@ -39,6 +41,7 @@ export const api = {
   comment: commentApi,
   review: reviewApi,
   game: gameApi,
-  health: healthApi
+  health: healthApi,
+  story: storyApi
 } as const;
 

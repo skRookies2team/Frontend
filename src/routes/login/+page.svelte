@@ -29,12 +29,20 @@
         goto('/');
       } else {
         // 로그인
-        await api.auth.login({
+        const response = await api.auth.login({
           username,
           password
         });
+        
+        console.log('로그인 응답:', response);
+        console.log('저장된 토큰:', localStorage.getItem('accessToken'));
+        
         alert('로그인 되었습니다!');
-        goto('/');
+        
+        // 약간의 딜레이 후 이동
+        setTimeout(() => {
+          goto('/');
+        }, 100);
       }
     } catch (error) {
       if (error instanceof ApiError) {

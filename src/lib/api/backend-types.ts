@@ -56,8 +56,148 @@ export interface GenerateStoryRequestDto {
   title: string;
   description?: string;
   novelText: string;
+  selectedGaugeIds: string[]; // Required, min 2
+  numEpisodes?: number; // 1-10, default 3
+  maxDepth?: number; // 2-5, default 3
+  endingConfig?: {
+    happy?: number;
+    tragic?: number;
+    neutral?: number;
+    open?: number;
+    bad?: number;
+  };
+  numEpisodeEndings?: number; // default 3
+}
+
+// ==================== Story Management DTOs ====================
+
+export type StoryStatus = 
+  | 'ANALYZING' 
+  | 'SUMMARY_READY' 
+  | 'CHARACTERS_READY' 
+  | 'GAUGES_READY' 
+  | 'GAUGES_SELECTED' 
+  | 'CONFIGURED' 
+  | 'GENERATING' 
+  | 'COMPLETED' 
+  | 'FAILED';
+
+export interface StoryUploadRequestDto {
+  title: string;
+  novelText: string;
+}
+
+export interface StoryUploadResponseDto {
+  storyId: string;
+  title: string;
+  status: StoryStatus;
+  createdAt: string;
+}
+
+export interface CharacterDto {
+  name: string;
+  aliases: string[];
+  description: string;
+  relationships: string[];
+}
+
+export interface StoryCharactersResponseDto {
+  storyId: string;
+  status: StoryStatus;
+  characters: CharacterDto[];
+}
+
+export interface StorySummaryResponseDto {
+  storyId: string;
+  status: StoryStatus;
+  summary: string;
+}
+
+export interface StoryGaugesResponseDto {
+  storyId: string;
+  status: StoryStatus;
+  gauges: GaugeDto[];
+}
+
+export interface GaugeSelectionRequestDto {
+  selectedGaugeIds: string[]; // exactly 2
+}
+
+export interface GaugeSelectionResponseDto {
+  storyId: string;
+  status: StoryStatus;
+  selectedGauges: GaugeDto[];
+}
+
+export interface StoryConfigRequestDto {
+  description?: string;
   numEpisodes?: number; // 1-10
-  maxDepth?: number; // 1-5
+  maxDepth?: number; // 2-5
+  endingConfig: {
+    [key: string]: number; // happy, tragic, neutral, open, bad
+  };
+  numEpisodeEndings?: number; // 1-5
+}
+
+export interface ConfigData {
+  description?: string;
+  numEpisodes: number;
+  maxDepth: number;
+  endingConfig: {
+    [key: string]: number;
+  };
+  numEpisodeEndings: number;
+}
+
+export interface StoryConfigResponseDto {
+  storyId: string;
+  status: StoryStatus;
+  config: ConfigData;
+}
+
+export interface StoryGenerationStartResponseDto {
+  storyId: string;
+  status: StoryStatus;
+  message: string;
+  estimatedTime: string;
+}
+
+export interface ProgressData {
+  currentPhase: string;
+  completedEpisodes: number;
+  totalEpisodes: number;
+  percentage: number;
+  message: string;
+  error?: string;
+}
+
+export interface StoryProgressResponseDto {
+  storyId: string;
+  status: StoryStatus;
+  progress: ProgressData;
+}
+
+export interface MetadataData {
+  title: string;
+  description?: string;
+  totalEpisodes: number;
+  totalNodes: number;
+  totalGauges: number;
+  createdAt: string;
+}
+
+export interface PreviewData {
+  firstEpisodeTitle: string;
+  firstEpisodeIntro: string;
+  selectedGauges: GaugeDto[];
+}
+
+export interface StoryResultResponseDto {
+  storyId: string;
+  status: StoryStatus;
+  storyDataId: number;
+  metadata: MetadataData;
+  preview: PreviewData;
 }
 
 // ==================== Response DTOs ====================

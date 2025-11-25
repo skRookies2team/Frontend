@@ -1,6 +1,7 @@
 {
 	"/": [],
 	"/community": [],
+	"/community/[postId]": [],
 	"/creator": [],
 	"/creator/wizard": [],
 	"/login": [],

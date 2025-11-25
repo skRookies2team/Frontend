@@ -1,25 +1,52 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
-  import { api, type StoryData, ApiError } from '$lib/api';
+  import { api, ApiError, type CharacterDto, type GaugeDto, type StoryStatus } from '$lib/api';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   
   // 단계 상태
   let currentStep = $state(1);
+  let storyId = $state('');
   
   // 1단계: 소설 텍스트 입력
   let title = $state('');
-  let description = $state('');
   let novelText = $state('');
+  let uploading = $state(false);
   
-  // 2단계: 설정
+  // 2단계: 등장인물 & 요약 (자동 추출)
+  let summary = $state('');
+  let characters = $state<CharacterDto[]>([]);
+  let loadingAnalysis = $state(false);
+  
+  // 3단계: 게이지 선택 (5개 → 2개 선택)
+  let proposedGauges = $state<GaugeDto[]>([]);
+  let selectedGaugeIds = $state<string[]>([]);
+  let loadingGauges = $state(false);
+  let selectingGauges = $state(false);
+  
+  // 4단계: 엔딩 설계
+  let description = $state('');
+  let endingConfig = $state<{ [key: string]: number }>({
+    happy: 2,
+    tragic: 1,
+    neutral: 1,
+    open: 1,
+    bad: 0
+  });
   let numEpisodes = $state(5);
   let maxDepth = $state(3);
+  let numEpisodeEndings = $state(3);
+  let configuringStory = $state(false);
   
-  // 생성 상태
+  // 5-6단계: 스토리 생성 중
   let generating = $state(false);
   let progress = $state(0);
-  let generatedStory: StoryData | null = $state(null);
+  let progressMessage = $state('');
+  let currentPhase = $state('');
+  
+  // 7단계: 완료
+  let storyDataId = $state<number | null>(null);
+  let metadata = $state<any>(null);
   let error = $state('');
   
   // 인증 확인
@@ -31,30 +58,375 @@
   });
   
   const steps = [
-    { number: 1, title: '소설 입력', desc: '텍스트 입력' },
-    { number: 2, title: '설정', desc: '에피소드/깊이' },
-    { number: 3, title: '생성', desc: 'AI 스토리 생성' },
-    { number: 4, title: '완료', desc: '확인 및 저장' },
+    { number: 1, title: '소설 텍스트', desc: '전문 입력' },
+    { number: 2, title: '등장인물', desc: '자동 추출' },
+    { number: 3, title: '게이지', desc: '5개 → 2개 선택' },
+    { number: 4, title: '엔딩', desc: '예상 엔딩 설계' },
+    { number: 5, title: '스토리 트리', desc: '자동 생성' },
+    { number: 6, title: '디테일 추정', desc: 'NPC/상황/관계' },
+    { number: 7, title: '완료', desc: '체크/등록' },
   ];
   
   function canGoNext(): boolean {
     switch (currentStep) {
       case 1: return novelText.length >= 100 && title.length > 0;
-      case 2: return true;
-      case 3: return generatedStory !== null;
+      case 2: return characters.length > 0 && summary.length > 0;
+      case 3: return selectedGaugeIds.length === 2;
+      case 4: return true;
+      case 5: case 6: return false; // 자동 진행
+      case 7: return storyDataId !== null;
       default: return false;
     }
   }
   
-  function nextStep() {
-    if (currentStep < 4 && canGoNext()) {
-      if (currentStep === 2) {
-        // 2단계에서 3단계로 넘어갈 때 자동 생성
-        generateStory();
+  function toggleGauge(gaugeId: string) {
+    if (selectedGaugeIds.includes(gaugeId)) {
+      selectedGaugeIds = selectedGaugeIds.filter(id => id !== gaugeId);
+    } else if (selectedGaugeIds.length < 2) {
+      selectedGaugeIds = [...selectedGaugeIds, gaugeId];
+    } else {
+      // 이미 2개 선택됨: 첫 번째를 제거하고 새로운 것 추가
+      selectedGaugeIds = [selectedGaugeIds[1], gaugeId];
+    }
+  }
+  
+  // 1단계: 소설 업로드
+  async function uploadNovel() {
+    console.log('uploadNovel 호출됨');
+    console.log('canGoNext:', canGoNext());
+    console.log('title:', title);
+    console.log('novelText length:', novelText.length);
+    
+    if (!canGoNext()) {
+      alert('제목과 소설 텍스트를 입력해주세요 (최소 100자)');
+      return;
+    }
+    
+    uploading = true;
+    error = '';
+    
+    try {
+      console.log('API 호출 시작...');
+      const response = await api.story.uploadNovel({
+        title,
+        novelText
+      });
+      
+      console.log('업로드 성공:', response);
+      storyId = response.storyId;
+      currentStep = 2;
+      
+      // 2단계로 이동 후 자동으로 분석 데이터 로드
+      loadAnalysisData();
+    } catch (err: any) {
+      console.error('업로드 실패:', err);
+      if (err instanceof ApiError) {
+        error = err.data?.message || '소설 업로드에 실패했습니다.';
+        alert('업로드 실패: ' + error);
       } else {
+        error = '네트워크 오류가 발생했습니다.';
+        alert('네트워크 오류: ' + err.message);
+      }
+    } finally {
+      uploading = false;
+    }
+  }
+  
+  // 2단계: 분석 데이터 로드 (폴링)
+  async function loadAnalysisData() {
+    loadingAnalysis = true;
+    
+    try {
+      // 진행률 폴링: CHARACTERS_READY가 될 때까지
+      const checkProgress = async (): Promise<void> => {
+        const progressData = await api.story.getProgress(storyId);
+        
+        if (progressData.status === 'CHARACTERS_READY' || progressData.status === 'GAUGES_READY') {
+          // 요약과 캐릭터 로드
+          const [summaryData, charactersData] = await Promise.all([
+            api.story.getSummary(storyId),
+            api.story.getCharacters(storyId)
+          ]);
+          
+          summary = summaryData.summary;
+          characters = charactersData.characters;
+          loadingAnalysis = false;
+        } else if (progressData.status === 'FAILED') {
+          throw new Error(progressData.progress?.error || '분석 실패');
+        } else {
+          // 3초 후 다시 체크
+          setTimeout(() => checkProgress(), 3000);
+        }
+      };
+      
+      await checkProgress();
+    } catch (err: any) {
+      console.error('분석 데이터 로드 실패:', err);
+      error = err.message || '분석에 실패했습니다.';
+      loadingAnalysis = false;
+    }
+  }
+  
+  async function nextStep() {
+    console.log('nextStep 호출됨, currentStep:', currentStep);
+    
+    try {
+      if (currentStep === 1) {
+        console.log('1단계: uploadNovel 호출');
+        await uploadNovel();
+      } else if (currentStep === 2) {
+        console.log('2단계: 게이지 로드');
+        // 2단계 → 3단계: 게이지 로드
+        currentStep = 3;
+        await loadGauges();
+      } else if (currentStep === 3) {
+        console.log('3단계: 게이지 선택 제출');
+        // 3단계 → 4단계: 게이지 선택 제출
+        await submitGaugeSelection();
+      } else if (currentStep === 4) {
+        console.log('4단계: 설정 제출 & 생성 시작');
+        // 4단계 → 5단계: 설정 제출 & 생성 시작
+        await submitConfig();
+      } else if (canGoNext()) {
+        console.log('일반 다음 단계');
         currentStep++;
       }
+    } catch (error) {
+      console.error('nextStep 에러:', error);
+      alert('에러 발생: ' + error);
     }
+  }
+  
+  // 3단계: 게이지 제안 로드
+  async function loadGauges() {
+    loadingGauges = true;
+    error = '';
+    
+    try {
+      const response = await api.story.getGauges(storyId);
+      proposedGauges = response.gauges;
+    } catch (err: any) {
+      console.error('게이지 로드 실패:', err);
+      if (err instanceof ApiError) {
+        error = err.data?.message || '게이지 로드에 실패했습니다.';
+      } else {
+        error = '네트워크 오류가 발생했습니다.';
+      }
+    } finally {
+      loadingGauges = false;
+    }
+  }
+  
+  // 3단계: 게이지 선택 제출
+  async function submitGaugeSelection() {
+    if (selectedGaugeIds.length !== 2) {
+      alert('게이지를 정확히 2개 선택해주세요.');
+      return;
+    }
+    
+    selectingGauges = true;
+    error = '';
+    
+    try {
+      await api.story.selectGauges(storyId, {
+        selectedGaugeIds
+      });
+      
+      currentStep = 4;
+    } catch (err: any) {
+      console.error('게이지 선택 실패:', err);
+      if (err instanceof ApiError) {
+        error = err.data?.message || '게이지 선택에 실패했습니다.';
+      } else {
+        error = '네트워크 오류가 발생했습니다.';
+      }
+    } finally {
+      selectingGauges = false;
+    }
+  }
+  
+  // 4단계: 설정 제출 & 생성 시작
+  async function submitConfig() {
+    configuringStory = true;
+    error = '';
+    
+    try {
+      // 설정 저장
+      await api.story.configureStory(storyId, {
+        description,
+        numEpisodes,
+        maxDepth,
+        endingConfig,
+        numEpisodeEndings
+      });
+      
+      // 생성 시작
+      const startResponse = await api.story.startGeneration(storyId);
+      console.log('생성 시작 응답:', startResponse);
+      
+      currentStep = 5;
+      generating = true;
+      
+      // 진행률 폴링 시작 (개선된 버전)
+      pollProgressImproved();
+      
+    } catch (err: any) {
+      console.error('생성 실패:', err);
+      if (err instanceof ApiError) {
+        error = err.data?.message || '스토리 생성에 실패했습니다.';
+      } else {
+        error = '네트워크 오류가 발생했습니다.';
+      }
+      generating = false;
+    } finally {
+      configuringStory = false;
+    }
+  }
+  
+  // 개선된 진행률 폴링 (에러를 무시하고 계속 시도)
+  async function pollProgressImproved() {
+    generating = true;
+    error = '';
+    progress = 0;
+    progressMessage = '스토리 생성 중...';
+    
+    let pollCount = 0;
+    const maxPolls = 300; // 최대 15분 (3초 * 300)
+    
+    const poll = async (): Promise<void> => {
+      try {
+        pollCount++;
+        
+        if (pollCount % 10 === 0) {
+          console.log(`폴링 ${pollCount}회차 (${Math.floor(pollCount * 3 / 60)}분 경과)`);
+        }
+        
+        // 진행률 조회 시도
+        try {
+          const progressData = await api.story.getProgress(storyId);
+          
+          // 진행률 업데이트
+          if (progressData.progress) {
+            progress = progressData.progress.percentage || progress;
+            progressMessage = progressData.progress.message || progressMessage;
+            currentPhase = progressData.progress.currentPhase || currentPhase;
+            
+            // 단계 자동 전환
+            if (progress >= 50 && currentStep === 5) {
+              currentStep = 6;
+            }
+          }
+          
+          // 상태 확인
+          if (progressData.status === 'COMPLETED') {
+            console.log('✅ 생성 완료! 결과 로드 중...');
+            progress = 100;
+            await loadResultDirectly();
+            return;
+          }
+          
+          // FAILED 상태는 일단 무시하고 계속 시도
+          if (progressData.status === 'FAILED') {
+            console.warn('⚠️ FAILED 상태 감지, 계속 폴링 시도...');
+          }
+          
+        } catch (progressErr) {
+          // 진행률 조회 에러는 로그만 찍고 무시
+          if (pollCount % 10 === 0) {
+            console.warn('진행률 조회 실패 (무시하고 계속):', progressErr);
+          }
+        }
+        
+        // 타임아웃 체크
+        if (pollCount >= maxPolls) {
+          console.error('❌ 폴링 타임아웃');
+          error = '생성 시간이 너무 오래 걸립니다. 백엔드에서 생성이 완료되었는지 확인해주세요.';
+          generating = false;
+          return;
+        }
+        
+        // 3초 후 다시 시도
+        setTimeout(() => poll(), 3000);
+        
+      } catch (err: any) {
+        console.error('폴링 중 치명적 오류:', err);
+        error = `폴링 오류: ${err.message}`;
+        generating = false;
+      }
+    };
+    
+    await poll();
+  }
+  
+  // 결과 직접 조회 (재시도 로직 포함)
+  async function loadResultDirectly() {
+    const maxRetries = 5;
+    let retryCount = 0;
+    
+    const tryLoad = async (): Promise<void> => {
+      try {
+        retryCount++;
+        console.log(`결과 조회 시도 ${retryCount}/${maxRetries}... storyId:`, storyId);
+        
+        const result = await api.story.getResult(storyId);
+        console.log('✅ 결과 조회 성공:', result);
+        
+        storyDataId = result.storyDataId;
+        metadata = result.metadata;
+        
+        currentStep = 7;
+        generating = false;
+        
+        alert('🎉 스토리 생성이 완료되었습니다!');
+        
+      } catch (err: any) {
+        console.error(`결과 조회 실패 (${retryCount}/${maxRetries}):`, err);
+        
+        if (retryCount < maxRetries) {
+          // 재시도
+          console.log(`⏳ 5초 후 다시 시도...`);
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          await tryLoad();
+        } else {
+          // 최대 재시도 초과
+          console.error('=== 최종 에러 정보 ===');
+          console.error('storyId:', storyId);
+          console.error('에러 객체:', err);
+          if (err instanceof ApiError) {
+            console.error('API Error Status:', err.status);
+            console.error('API Error Data:', err.data);
+          }
+          
+          if (err instanceof ApiError && err.status === 404) {
+            error = '❌ 스토리를 찾을 수 없습니다 (404)\n\n' + 
+                    `storyId: ${storyId}\n` +
+                    '백엔드에서 생성은 완료되었지만 결과를 저장하지 못했을 수 있습니다.\n\n' +
+                    '백엔드 콘솔 로그를 확인해주세요.';
+          } else if (err instanceof ApiError && err.status === 500) {
+            error = `❌ 백엔드 서버 내부 오류 (500)\n\n` +
+                    `storyId: ${storyId}\n` +
+                    `에러 메시지: ${err.data?.message || err.message}\n\n` +
+                    '백엔드 콘솔에서 다음을 확인하세요:\n' +
+                    '1. Exception 스택 트레이스\n' +
+                    '2. /api/stories/${storyId}/result 관련 로그\n' +
+                    '3. 데이터베이스 연결 상태\n' +
+                    '4. AI 서버 응답 데이터';
+          } else if (err instanceof ApiError) {
+            error = `❌ API 에러 (${err.status})\n\n` +
+                    `storyId: ${storyId}\n` +
+                    `메시지: ${err.data?.message || err.message}`;
+          } else {
+            error = `❌ 네트워크 오류\n\n` +
+                    `storyId: ${storyId}\n` +
+                    `메시지: ${err.message}`;
+          }
+          
+          generating = false;
+        }
+      }
+    };
+    
+    await tryLoad();
   }
   
   function prevStep() {
@@ -80,60 +452,120 @@
     }
   }
   
-  async function generateStory() {
-    currentStep = 3;
+  // 5-6단계: 진행률 폴링 (현재 사용 안 함 - 에러 발생으로 임시 비활성화)
+  /*
+  async function pollProgress() {
     generating = true;
     error = '';
-    progress = 0;
+    let pollCount = 0;
+    const maxPolls = 200; // 최대 10분 (3초 * 200)
     
-    // 진행률 시뮬레이션
-    const progressInterval = setInterval(() => {
-      if (progress < 90) {
-        progress += Math.random() * 5;
+    const poll = async (): Promise<void> => {
+      try {
+        pollCount++;
+        console.log(`폴링 ${pollCount}회차, storyId:`, storyId);
+        
+        const progressData = await api.story.getProgress(storyId);
+        console.log('진행률 데이터:', progressData);
+        
+        progress = progressData.progress?.percentage || 0;
+        progressMessage = progressData.progress?.message || '';
+        currentPhase = progressData.progress?.currentPhase || '';
+        
+        // 5단계 (스토리 트리 생성): progress < 50
+        if (progress < 50 && currentStep === 5) {
+          // 계속 5단계 유지
+        } 
+        // 6단계 (디테일 추정): progress >= 50 && progress < 100
+        else if (progress >= 50 && progress < 100 && currentStep === 5) {
+          currentStep = 6;
+        }
+        
+        if (progressData.status === 'COMPLETED') {
+          // 완료: 결과 로드
+          console.log('생성 완료! 결과 로드 중...');
+          progress = 100;
+          await loadResult();
+        } else if (progressData.status === 'FAILED') {
+          const errorMsg = progressData.progress?.error || '알 수 없는 오류';
+          console.error('백엔드에서 FAILED 상태 반환:', errorMsg);
+          console.error('전체 진행률 데이터:', JSON.stringify(progressData, null, 2));
+          
+          // 에러 메시지 상세히 표시
+          error = `생성 실패: ${errorMsg}\n\n` +
+                  `현재 단계: ${currentPhase}\n` +
+                  `진행률: ${progress}%\n` +
+                  `메시지: ${progressMessage}`;
+          
+          generating = false;
+        } else if (pollCount >= maxPolls) {
+          console.error('폴링 타임아웃');
+          error = '생성 시간이 너무 오래 걸립니다. 잠시 후 다시 시도해주세요.';
+          generating = false;
+        } else {
+          // 3초 후 다시 체크
+          setTimeout(() => poll(), 3000);
+        }
+      } catch (err: any) {
+        console.error('진행률 조회 중 예외 발생:', err);
+        if (err instanceof ApiError) {
+          error = `API 에러: ${err.status} - ${err.data?.message || err.message}`;
+        } else {
+          error = `네트워크 에러: ${err.message}`;
+        }
+        generating = false;
       }
-    }, 1000);
+    };
     
+    await poll();
+  }
+  */
+  
+  // 7단계: 완료 결과 로드 (구버전 - 사용 안 함)
+  /*
+  async function loadResult() {
     try {
-      const story = await api.game.generateStory({
-        title,
-        description,
-        novelText,
-        numEpisodes,
-        maxDepth
-      });
+      const result = await api.story.getResult(storyId);
       
-      progress = 100;
-      generatedStory = story;
-      currentStep = 4;
+      storyDataId = result.storyDataId;
+      metadata = result.metadata;
+      
+      currentStep = 7;
+      generating = false;
     } catch (err: any) {
-      console.error('스토리 생성 실패:', err);
-      if (err instanceof ApiError) {
-        error = err.data?.message || '스토리 생성에 실패했습니다.';
-      } else {
-        error = '네트워크 오류가 발생했습니다.';
-      }
-    } finally {
-      clearInterval(progressInterval);
+      console.error('결과 로드 실패:', err);
+      error = '결과 로드에 실패했습니다.';
       generating = false;
     }
   }
+  */
   
   function startPlaying() {
-    if (generatedStory) {
-      goto(`/play/${generatedStory.id}`);
+    if (storyDataId) {
+      goto(`/play/${storyDataId}`);
     }
   }
   
   function createNew() {
     currentStep = 1;
+    storyId = '';
     title = '';
-    description = '';
     novelText = '';
+    description = '';
+    summary = '';
+    characters = [];
+    proposedGauges = [];
+    selectedGaugeIds = [];
+    endingConfig = { happy: 2, tragic: 1, neutral: 1, open: 1, bad: 0 };
     numEpisodes = 5;
     maxDepth = 3;
-    generatedStory = null;
+    numEpisodeEndings = 3;
+    storyDataId = null;
+    metadata = null;
     error = '';
     progress = 0;
+    progressMessage = '';
+    currentPhase = '';
   }
 </script>
 
@@ -240,50 +672,180 @@
               />
             </div>
 
-            {#if canGoNext()}
+            {#if error}
+              <div class="error-banner">
+                ❌ {error}
+              </div>
+            {/if}
+            
+            {#if uploading}
+              <div class="info-banner">
+                ⏳ 소설을 업로드하고 있습니다...
+              </div>
+            {:else if canGoNext()}
               <div class="success-banner">
-                ✅ 준비 완료! 다음 단계로 진행하세요
+                ✅ 준비 완료! 소설 업로드 버튼을 클릭하세요
               </div>
             {/if}
           </div>
         </div>
 
       {:else if currentStep === 2}
-        <!-- 2단계: 설정 -->
+        <!-- 2단계: 등장인물 자동 추출 -->
         <div class="content-card">
           <div class="card-header">
-            <h2 class="card-title">⚙️ 2단계: 스토리 설정</h2>
-            <p class="card-desc">생성할 스토리의 규모를 설정하세요</p>
+            <h2 class="card-title">👥 2단계: 등장인물 자동 추출</h2>
+            <p class="card-desc">AI가 소설에서 등장인물을 자동으로 추출합니다</p>
+          </div>
+          <div class="card-body">
+            {#if loadingAnalysis}
+              <div class="extracting-state">
+                <div class="spinner"></div>
+                <p class="extracting-text">AI가 소설을 분석하고 있습니다...</p>
+                <p class="extracting-hint">요약과 등장인물을 추출하는 중...</p>
+              </div>
+            {:else if characters.length > 0}
+              <div class="analysis-results">
+                <!-- 요약 -->
+                {#if summary}
+                  <div class="summary-section">
+                    <h3 class="section-subtitle">📖 소설 요약</h3>
+                    <div class="summary-box">
+                      {summary}
+                    </div>
+                  </div>
+                {/if}
+                
+                <!-- 등장인물 -->
+                <div class="characters-section">
+                  <h3 class="section-subtitle">👥 추출된 등장인물</h3>
+                  <div class="character-list">
+                    {#each characters as character}
+                      <div class="character-card">
+                        <div class="character-avatar">
+                          {character.name.charAt(0)}
+                        </div>
+                        <div class="character-details">
+                          <div class="character-name">{character.name}</div>
+                          {#if character.aliases && character.aliases.length > 0}
+                            <div class="character-aliases">별칭: {character.aliases.join(', ')}</div>
+                          {/if}
+                          <div class="character-description">{character.description}</div>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+                
+                <div class="success-banner">
+                  ✅ 분석 완료! 등장인물 {characters.length}명 추출
+                </div>
+              </div>
+            {/if}
+          </div>
+        </div>
+
+      {:else if currentStep === 3}
+        <!-- 3단계: 게이지 선택 -->
+        <div class="content-card">
+          <div class="card-header">
+            <h2 class="card-title">📊 3단계: 게이지 선택</h2>
+            <p class="card-desc">스토리에서 사용할 상태 지표를 선택하세요 (최소 2개)</p>
+          </div>
+          <div class="card-body">
+            {#if loadingGauges}
+              <div class="loading-state">
+                <div class="spinner"></div>
+                <p>AI가 소설 주제에 맞는 게이지를 제안하고 있습니다...</p>
+              </div>
+            {:else if proposedGauges.length > 0}
+              <div class="form-group">
+                <label class="form-label">AI가 제안한 게이지 (정확히 2개 선택) <span class="required">*</span></label>
+                <p class="field-hint">소설의 주제와 내용에 맞춰 AI가 선택한 5가지 게이지입니다</p>
+                <div class="gauge-grid">
+                  {#each proposedGauges as gauge}
+                    <button
+                      type="button"
+                      class="gauge-option"
+                      class:selected={selectedGaugeIds.includes(gauge.id)}
+                      onclick={() => toggleGauge(gauge.id)}
+                      disabled={selectingGauges}
+                    >
+                      <div class="gauge-check">
+                        {#if selectedGaugeIds.includes(gauge.id)}
+                          ✓
+                        {/if}
+                      </div>
+                      <div class="gauge-info">
+                        <div class="gauge-name">{gauge.name}</div>
+                        <div class="gauge-desc">{gauge.meaning || gauge.description}</div>
+                        {#if gauge.min_label && gauge.max_label}
+                          <div class="gauge-range">
+                            {gauge.min_label} ↔ {gauge.max_label}
+                          </div>
+                        {/if}
+                      </div>
+                    </button>
+                  {/each}
+                </div>
+                {#if selectedGaugeIds.length > 0}
+                  <p class="selection-count" class:complete={selectedGaugeIds.length === 2}>
+                    {selectedGaugeIds.length}/2 선택됨 {selectedGaugeIds.length === 2 ? '✓' : ''}
+                  </p>
+                {/if}
+              </div>
+            {/if}
+          </div>
+        </div>
+
+      {:else if currentStep === 4}
+        <!-- 4단계: 엔딩 설계 -->
+        <div class="content-card">
+          <div class="card-header">
+            <h2 class="card-title">🎬 4단계: 예상 엔딩 설계</h2>
+            <p class="card-desc">스토리에서 생성할 엔딩의 유형과 개수를 설정하세요</p>
           </div>
           <div class="card-body">
             <div class="form-group">
-              <label class="form-label">에피소드 수 (1-10)</label>
-              <div class="slider-container">
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  bind:value={numEpisodes}
-                  class="slider"
-                />
-                <span class="slider-value">{numEpisodes}화</span>
+              <label class="form-label">엔딩 구성</label>
+              <div class="ending-config">
+                <div class="ending-item">
+                  <label>😊 해피 엔딩</label>
+                  <input type="number" min="0" max="5" bind:value={endingConfig.happy} class="ending-input" />
+                </div>
+                <div class="ending-item">
+                  <label>😢 비극 엔딩</label>
+                  <input type="number" min="0" max="5" bind:value={endingConfig.tragic} class="ending-input" />
+                </div>
+                <div class="ending-item">
+                  <label>😐 중립 엔딩</label>
+                  <input type="number" min="0" max="5" bind:value={endingConfig.neutral} class="ending-input" />
+                </div>
+                <div class="ending-item">
+                  <label>🤔 열린 엔딩</label>
+                  <input type="number" min="0" max="5" bind:value={endingConfig.open} class="ending-input" />
+                </div>
+                <div class="ending-item">
+                  <label>💀 배드 엔딩</label>
+                  <input type="number" min="0" max="5" bind:value={endingConfig.bad} class="ending-input" />
+                </div>
               </div>
-              <p class="field-hint">더 많은 에피소드는 더 긴 스토리를 생성합니다</p>
             </div>
 
             <div class="form-group">
-              <label class="form-label">분기 깊이 (1-5)</label>
+              <label class="form-label">에피소드 수 (1-10)</label>
               <div class="slider-container">
-                <input
-                  type="range"
-                  min="1"
-                  max="5"
-                  bind:value={maxDepth}
-                  class="slider"
-                />
+                <input type="range" min="1" max="10" bind:value={numEpisodes} class="slider" />
+                <span class="slider-value">{numEpisodes}화</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">분기 깊이 (2-5)</label>
+              <div class="slider-container">
+                <input type="range" min="2" max="5" bind:value={maxDepth} class="slider" />
                 <span class="slider-value">레벨 {maxDepth}</span>
               </div>
-              <p class="field-hint">더 깊은 분기는 더 복잡한 선택을 제공합니다</p>
             </div>
 
             <div class="info-card">
@@ -292,87 +854,123 @@
                 <li>총 에피소드: <strong>{numEpisodes}화</strong></li>
                 <li>분기 깊이: <strong>레벨 {maxDepth}</strong></li>
                 <li>예상 노드 수: <strong>약 {Math.pow(2, maxDepth) * numEpisodes}개</strong></li>
-                <li>생성 시간: <strong>약 {Math.ceil((numEpisodes * maxDepth) / 2)}분</strong></li>
+                <li>총 엔딩 수: <strong>{Object.values(endingConfig).reduce((a, b) => a + b, 0)}개</strong></li>
               </ul>
             </div>
           </div>
         </div>
 
-      {:else if currentStep === 3}
-        <!-- 3단계: 생성 중 -->
+      {:else if currentStep === 5}
+        <!-- 5단계: 스토리 트리 생성 -->
         <div class="content-card">
           <div class="card-header">
-            <h2 class="card-title">✨ 3단계: AI 스토리 생성 중</h2>
-            <p class="card-desc">AI가 당신의 소설을 분석하고 인터랙티브 게임으로 변환하고 있습니다...</p>
+            <h2 class="card-title">🌳 5단계: 스토리 트리 자동 생성</h2>
+            <p class="card-desc">AI가 스토리의 구조와 분기를 생성하고 있습니다...</p>
           </div>
           <div class="card-body">
-            {#if generating}
-              <div class="generating-state">
-                <div class="spinner"></div>
-                <div class="progress-info">
-                  <div class="progress-bar">
-                    <div class="progress-fill" style="width: {progress}%"></div>
-                  </div>
-                  <p class="progress-text">{Math.round(progress)}% 완료</p>
+            <div class="generating-state">
+              <div class="spinner"></div>
+              <div class="progress-info">
+                <div class="progress-bar">
+                  <div class="progress-fill" style="width: {progress}%"></div>
                 </div>
-                <div class="generating-steps">
-                  <div class="gen-step" class:active={progress >= 0}>
-                    🔍 소설 분석 중...
-                  </div>
-                  <div class="gen-step" class:active={progress >= 25}>
-                    👥 등장인물 추출 중...
-                  </div>
-                  <div class="gen-step" class:active={progress >= 50}>
-                    🎭 스토리 분기 생성 중...
-                  </div>
-                  <div class="gen-step" class:active={progress >= 75}>
-                    📝 노드 상세화 중...
-                  </div>
-                  <div class="gen-step" class:active={progress >= 90}>
-                    ✅ 최종 검증 중...
-                  </div>
-                </div>
+                <p class="progress-text">{Math.round(progress)}% 완료</p>
+                {#if progressMessage}
+                  <p class="progress-message">{progressMessage}</p>
+                {/if}
+                {#if currentPhase}
+                  <p class="progress-phase">현재 단계: {currentPhase}</p>
+                {/if}
               </div>
-            {:else if error}
+            </div>
+          </div>
+        </div>
+
+      {:else if currentStep === 6}
+        <!-- 6단계: 디테일 추정 -->
+        <div class="content-card">
+          <div class="card-header">
+            <h2 class="card-title">✨ 6단계: 디테일 추정 중</h2>
+            <p class="card-desc">NPC, 상황, 관계를 상세화하고 있습니다...</p>
+          </div>
+          <div class="card-body">
+            <div class="generating-state">
+              <div class="spinner"></div>
+              <div class="progress-info">
+                <div class="progress-bar">
+                  <div class="progress-fill" style="width: {progress}%"></div>
+                </div>
+                <p class="progress-text">{Math.round(progress)}% 완료</p>
+                {#if progressMessage}
+                  <p class="progress-message">{progressMessage}</p>
+                {/if}
+                {#if currentPhase}
+                  <p class="progress-phase">현재 단계: {currentPhase}</p>
+                {/if}
+              </div>
+            </div>
+            {#if error}
               <div class="error-state">
                 <div class="error-icon">❌</div>
                 <h3 class="error-title">생성 실패</h3>
-                <p class="error-message">{error}</p>
+                <div class="error-detail">
+                  {#each error.split('\n') as line}
+                    <p class="error-line">{line}</p>
+                  {/each}
+                </div>
                 <div class="error-actions">
-                  <Button onclick={() => generateStory()}>다시 시도</Button>
-                  <Button variant="outline" onclick={() => currentStep = 2}>설정 수정</Button>
+                  <Button onclick={() => { currentStep = 4; error = ''; }}>
+                    ← 설정 수정
+                  </Button>
+                  <Button variant="outline" onclick={() => { 
+                    console.log('=== 에러 상세 정보 ===');
+                    console.log('storyId:', storyId);
+                    console.log('error:', error);
+                    console.log('progress:', progress);
+                    console.log('currentPhase:', currentPhase);
+                    console.log('progressMessage:', progressMessage);
+                    alert('콘솔(F12)에서 상세 정보를 확인하세요');
+                  }}>
+                    🔍 콘솔에서 자세히 보기
+                  </Button>
                 </div>
               </div>
             {/if}
           </div>
         </div>
 
-      {:else if currentStep === 4}
-        <!-- 4단계: 완료 -->
+      {:else if currentStep === 7}
+        <!-- 7단계: 완료 -->
         <div class="content-card">
           <div class="card-header">
             <h2 class="card-title">🎉 4단계: 생성 완료!</h2>
             <p class="card-desc">인터랙티브 스토리가 성공적으로 생성되었습니다</p>
           </div>
           <div class="card-body">
-            {#if generatedStory}
+            {#if metadata && storyDataId}
               <div class="success-state">
                 <div class="success-icon">✨</div>
-                <h3 class="success-title">{generatedStory.title}</h3>
-                <p class="success-desc">{generatedStory.description}</p>
+                <h3 class="success-title">{metadata.title}</h3>
+                {#if metadata.description}
+                  <p class="success-desc">{metadata.description}</p>
+                {/if}
                 
                 <div class="story-stats">
                   <div class="stat-item">
                     <span class="stat-label">총 에피소드</span>
-                    <span class="stat-value">{generatedStory.totalEpisodes}화</span>
+                    <span class="stat-value">{metadata.totalEpisodes}화</span>
                   </div>
                   <div class="stat-item">
                     <span class="stat-label">총 노드</span>
-                    <span class="stat-value">{generatedStory.totalNodes}개</span>
+                    <span class="stat-value">{metadata.totalNodes}개</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">게이지 수</span>
+                    <span class="stat-value">{metadata.totalGauges}개</span>
                   </div>
                   <div class="stat-item">
                     <span class="stat-label">생성일</span>
-                    <span class="stat-value">{new Date(generatedStory.createdAt).toLocaleDateString('ko-KR')}</span>
+                    <span class="stat-value">{new Date(metadata.createdAt).toLocaleDateString('ko-KR')}</span>
                   </div>
                 </div>
 
@@ -403,15 +1001,23 @@
       </Button>
 
       <div class="step-indicator">
-        {currentStep} / 4 단계
+        {currentStep} / 7 단계
       </div>
 
       <Button
-        onclick={nextStep}
-        disabled={!canGoNext() || currentStep === 4 || generating}
+        onclick={async () => await nextStep()}
+        disabled={!canGoNext() || currentStep >= 5 || uploading || loadingAnalysis || loadingGauges || selectingGauges || configuringStory || generating}
         size="lg"
       >
-        다음 →
+        {#if currentStep === 1}
+          {uploading ? '업로드 중...' : '소설 업로드 →'}
+        {:else if currentStep === 3}
+          {selectingGauges ? '선택 중...' : '게이지 선택 →'}
+        {:else if currentStep === 4}
+          {configuringStory ? '시작 중...' : '생성 시작 →'}
+        {:else}
+          다음 →
+        {/if}
       </Button>
     </div>
   </div>
@@ -639,6 +1245,26 @@
     text-align: center;
   }
 
+  .error-banner {
+    padding: 1rem;
+    background: hsl(0 84.2% 60.2% / 0.1);
+    border: 1px solid hsl(0 84.2% 60.2%);
+    border-radius: var(--radius-md);
+    color: hsl(0 84.2% 60.2%);
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .info-banner {
+    padding: 1rem;
+    background: hsl(var(--primary) / 0.1);
+    border: 1px solid hsl(var(--primary));
+    border-radius: var(--radius-md);
+    color: hsl(var(--primary));
+    font-weight: 600;
+    text-align: center;
+  }
+
   /* 슬라이더 */
   .slider-container {
     display: flex;
@@ -673,6 +1299,82 @@
   .field-hint {
     margin-top: 0.5rem;
     font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .required {
+    color: hsl(0 84.2% 60.2%);
+    font-weight: 700;
+  }
+
+  .gauge-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .gauge-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: hsl(var(--card));
+    border: 2px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+  }
+
+  .gauge-option:hover {
+    border-color: hsl(var(--primary));
+    background: hsl(var(--muted) / 0.3);
+  }
+
+  .gauge-option.selected {
+    border-color: hsl(var(--primary));
+    background: hsl(var(--primary) / 0.1);
+  }
+
+  .gauge-check {
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 2px solid hsl(var(--border));
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: hsl(var(--primary));
+    flex-shrink: 0;
+  }
+
+  .gauge-option.selected .gauge-check {
+    border-color: hsl(var(--primary));
+    background: hsl(var(--primary));
+    color: white;
+  }
+
+  .gauge-info {
+    flex: 1;
+  }
+
+  .gauge-name {
+    font-weight: 600;
+    color: hsl(var(--foreground));
+    margin-bottom: 0.25rem;
+  }
+
+  .gauge-desc {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .selection-count {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
     color: hsl(var(--muted-foreground));
   }
 
@@ -872,6 +1574,211 @@
   .step-indicator {
     font-weight: 600;
     color: hsl(var(--muted-foreground));
+  }
+
+  /* 등장인물 */
+  .extracting-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 3rem;
+  }
+
+  .extracting-text {
+    font-size: 1.125rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .characters-list {
+    padding: 1rem;
+  }
+
+  .list-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: hsl(var(--foreground));
+  }
+
+  .character-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .character-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: hsl(var(--muted) / 0.3);
+    border-radius: var(--radius-md);
+  }
+
+  .character-avatar {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: hsl(var(--primary));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+
+  .character-name {
+    font-weight: 600;
+    color: hsl(var(--foreground));
+    text-align: center;
+  }
+
+  /* 엔딩 설정 */
+  .ending-config {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .ending-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .ending-item label {
+    font-weight: 600;
+    color: hsl(var(--foreground));
+    font-size: 0.875rem;
+  }
+
+  .ending-input {
+    padding: 0.5rem;
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  .ending-input:focus {
+    outline: none;
+    border-color: hsl(var(--primary));
+  }
+
+  /* 분석 결과 */
+  .analysis-results {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .section-subtitle {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: hsl(var(--foreground));
+  }
+
+  .summary-box {
+    padding: 1.5rem;
+    background: hsl(var(--muted) / 0.3);
+    border-radius: var(--radius-md);
+    line-height: 1.8;
+    color: hsl(var(--foreground));
+  }
+
+  .character-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .character-card {
+    display: flex;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+  }
+
+  .character-details {
+    flex: 1;
+  }
+
+  .character-aliases {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+    margin-top: 0.25rem;
+  }
+
+  .character-description {
+    margin-top: 0.5rem;
+    line-height: 1.6;
+    color: hsl(var(--foreground));
+  }
+
+  .extracting-hint {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+    margin-top: 0.5rem;
+  }
+
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 3rem;
+  }
+
+  .gauge-range {
+    font-size: 0.75rem;
+    color: hsl(var(--primary));
+    margin-top: 0.25rem;
+    font-weight: 600;
+  }
+
+  .selection-count.complete {
+    color: hsl(var(--primary));
+    font-weight: 700;
+  }
+
+  .progress-message,
+  .progress-phase {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+    margin-top: 0.5rem;
+  }
+
+  .progress-phase {
+    font-weight: 600;
+    color: hsl(var(--primary));
+  }
+
+  .error-detail {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    background: hsl(var(--muted) / 0.3);
+    border-radius: var(--radius-md);
+    text-align: left;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .error-line {
+    margin: 0.5rem 0;
+    color: hsl(var(--foreground));
+    font-family: monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
   }
 
   @media (max-width: 768px) {
