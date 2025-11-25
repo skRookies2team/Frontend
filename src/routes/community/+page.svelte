@@ -17,6 +17,18 @@
   let postContent = $state('');
   let postType = $state<PostType>(PostType.GENERAL);
   let submitting = $state(false);
+  
+  
+  // 에디터 설정
+  let fontSize = $state(15);
+  let fontFamily = $state('본문');
+  let isBold = $state(false);
+  let isItalic = $state(false);
+  let isUnderline = $state(false);
+  let isStrikethrough = $state(false);
+  let textAlign = $state('left');
+  
+  let contentEditableElement: HTMLDivElement;
 
   onMount(() => {
     loadPosts();
@@ -96,19 +108,166 @@
     postTitle = '';
     postContent = '';
     postType = PostType.GENERAL;
+    
+    // 에디터 초기화
+    if (contentEditableElement) {
+      contentEditableElement.innerHTML = '';
+    }
+    fontSize = 15;
+    fontFamily = '본문';
+    isBold = false;
+    isItalic = false;
+    isUnderline = false;
+    isStrikethrough = false;
+  }
+  
+  // 에디터 기능 함수들
+  function execCommand(command: string, value?: string) {
+    document.execCommand(command, false, value);
+    contentEditableElement?.focus();
+  }
+  
+  function toggleBold() {
+    isBold = !isBold;
+    execCommand('bold');
+  }
+  
+  function toggleItalic() {
+    isItalic = !isItalic;
+    execCommand('italic');
+  }
+  
+  function toggleUnderline() {
+    isUnderline = !isUnderline;
+    execCommand('underline');
+  }
+  
+  function toggleStrikethrough() {
+    isStrikethrough = !isStrikethrough;
+    execCommand('strikeThrough');
+  }
+  
+  function changeFontSize(size: number) {
+    fontSize = size;
+    execCommand('fontSize', '3');
+    // 선택된 텍스트의 폰트 크기 변경
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.fontSize = `${size}px`;
+      range.surroundContents(span);
+    }
+  }
+  
+  function changeFontFamily(family: string) {
+    fontFamily = family;
+    const fontMap: Record<string, string> = {
+      '본문': 'inherit',
+      '굴림': 'Gulim',
+      '돋움': 'Dotum',
+      '맑은 고딕': 'Malgun Gothic',
+      '나눔고딕': 'Nanum Gothic',
+      '나눔명조': 'Nanum Myeongjo'
+    };
+    execCommand('fontName', fontMap[family] || family);
+  }
+  
+  function setTextAlign(align: string) {
+    textAlign = align;
+    execCommand(`justify${align.charAt(0).toUpperCase() + align.slice(1)}`);
+  }
+  
+  function insertLink() {
+    const url = prompt('링크 URL을 입력하세요:');
+    if (url) {
+      execCommand('createLink', url);
+    }
+  }
+  
+  function insertHorizontalRule() {
+    execCommand('insertHorizontalRule');
+  }
+  
+  function undo() {
+    execCommand('undo');
+  }
+  
+  function redo() {
+    execCommand('redo');
+  }
+  
+  function setHeading(level: string) {
+    if (level === 'p') {
+      execCommand('formatBlock', '<p>');
+    } else {
+      execCommand('formatBlock', `<${level}>`);
+    }
+  }
+  
+  function insertImageFromEditor() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.onchange = (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (files) {
+        Array.from(files).forEach(file => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = `<img src="${event.target?.result}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0;" />`;
+            execCommand('insertHTML', img);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+    };
+    input.click();
+  }
+  
+  function insertVideoFromEditor() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'video/*';
+    input.multiple = true;
+    input.onchange = (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (files) {
+        Array.from(files).forEach(file => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const video = `<video src="${event.target?.result}" controls style="max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0;"></video>`;
+            execCommand('insertHTML', video);
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+    };
+    input.click();
+  }
+  
+  function getEditorContent(): string {
+    return contentEditableElement?.innerHTML || postContent;
   }
   
   async function submitPost() {
-    if (!postTitle.trim() || !postContent.trim()) {
+    const editorContent = getEditorContent();
+    
+    if (!postTitle.trim() || !editorContent.trim()) {
       alert('제목과 내용을 입력해주세요.');
       return;
     }
     
     submitting = true;
     try {
+      // TODO: 나중에 이미지/동영상 업로드 API 연동
+      // 에디터 내에 삽입된 이미지/동영상은 Base64로 인코딩되어 있음
+      // 필요시 별도 처리 가능
+      
       await api.post.createPost({
         title: postTitle,
-        content: postContent,
+        content: editorContent,
         type: postType
       });
       
@@ -326,14 +485,172 @@
         </div>
         
         <div class="form-group">
-          <label for="post-content" class="form-label">내용</label>
-          <textarea 
-            id="post-content"
-            class="form-textarea" 
+          <label class="form-label">내용</label>
+          
+          <!-- 에디터 툴바 -->
+          <div class="editor-toolbar">
+            <!-- 첫 번째 줄: 미디어 및 기능 버튼 -->
+            <div class="toolbar-row">
+              <button type="button" class="toolbar-btn" onclick={insertImageFromEditor} title="사진">
+                📷
+              </button>
+              <button type="button" class="toolbar-btn" onclick={insertVideoFromEditor} title="동영상">
+                🎥
+              </button>
+              <button type="button" class="toolbar-btn" onclick={insertLink} title="링크">
+                🔗
+              </button>
+              <button type="button" class="toolbar-btn" onclick={insertHorizontalRule} title="구분선">
+                ➖
+              </button>
+              
+              <div class="toolbar-divider"></div>
+              
+              <!-- 정렬 버튼 -->
+              <button 
+                type="button" 
+                class="toolbar-btn" 
+                class:active={textAlign === 'left'}
+                onclick={() => setTextAlign('left')} 
+                title="왼쪽 정렬"
+              >
+                ◀️
+              </button>
+              <button 
+                type="button" 
+                class="toolbar-btn"
+                class:active={textAlign === 'center'}
+                onclick={() => setTextAlign('center')} 
+                title="가운데 정렬"
+              >
+                ⏸️
+              </button>
+              <button 
+                type="button" 
+                class="toolbar-btn"
+                class:active={textAlign === 'right'}
+                onclick={() => setTextAlign('right')} 
+                title="오른쪽 정렬"
+              >
+                ▶️
+              </button>
+            </div>
+            
+            <!-- 두 번째 줄: 텍스트 스타일 -->
+            <div class="toolbar-row">
+              <!-- 문단 스타일 -->
+              <select 
+                class="toolbar-select" 
+                onchange={(e) => setHeading((e.target as HTMLSelectElement).value)}
+              >
+                <option value="p">본문</option>
+                <option value="h1">제목 1</option>
+                <option value="h2">제목 2</option>
+                <option value="h3">제목 3</option>
+              </select>
+              
+              <!-- 글꼴 선택 -->
+              <select 
+                class="toolbar-select" 
+                bind:value={fontFamily}
+                onchange={(e) => changeFontFamily((e.target as HTMLSelectElement).value)}
+              >
+                <option value="본문">본문</option>
+                <option value="굴림">굴림</option>
+                <option value="돋움">돋움</option>
+                <option value="맑은 고딕">맑은 고딕</option>
+                <option value="나눔고딕">나눔고딕</option>
+                <option value="나눔명조">나눔명조</option>
+              </select>
+              
+              <!-- 글자 크기 -->
+              <select 
+                class="toolbar-select toolbar-select-small" 
+                bind:value={fontSize}
+                onchange={(e) => changeFontSize(Number((e.target as HTMLSelectElement).value))}
+              >
+                <option value="10">10</option>
+                <option value="12">12</option>
+                <option value="14">14</option>
+                <option value="15">15</option>
+                <option value="16">16</option>
+                <option value="18">18</option>
+                <option value="20">20</option>
+                <option value="24">24</option>
+                <option value="28">28</option>
+                <option value="32">32</option>
+                <option value="36">36</option>
+              </select>
+              
+              <div class="toolbar-divider"></div>
+              
+              <!-- 텍스트 스타일 버튼 -->
+              <button 
+                type="button" 
+                class="toolbar-btn"
+                class:active={isBold}
+                onclick={toggleBold} 
+                title="굵게"
+              >
+                <strong>B</strong>
+              </button>
+              <button 
+                type="button" 
+                class="toolbar-btn"
+                class:active={isItalic}
+                onclick={toggleItalic} 
+                title="기울임"
+              >
+                <em>I</em>
+              </button>
+              <button 
+                type="button" 
+                class="toolbar-btn"
+                class:active={isUnderline}
+                onclick={toggleUnderline} 
+                title="밑줄"
+              >
+                <u>U</u>
+              </button>
+              <button 
+                type="button" 
+                class="toolbar-btn"
+                class:active={isStrikethrough}
+                onclick={toggleStrikethrough} 
+                title="취소선"
+              >
+                <s>S</s>
+              </button>
+              
+              <div class="toolbar-divider"></div>
+              
+              <!-- 실행 취소/다시 실행 -->
+              <button 
+                type="button" 
+                class="toolbar-btn"
+                onclick={undo} 
+                title="실행 취소"
+              >
+                ↶
+              </button>
+              <button 
+                type="button" 
+                class="toolbar-btn"
+                onclick={redo} 
+                title="다시 실행"
+              >
+                ↷
+              </button>
+            </div>
+          </div>
+          
+          <!-- 에디터 영역 -->
+          <div 
+            class="editor-content"
+            contenteditable="true"
+            bind:this={contentEditableElement}
             placeholder="내용을 입력하세요"
-            bind:value={postContent}
-            rows="10"
-          ></textarea>
+          ></div>
         </div>
       </div>
       
@@ -674,7 +991,7 @@
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius-lg);
     width: 100%;
-    max-width: 600px;
+    max-width: 900px;
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
@@ -723,6 +1040,13 @@
     font-weight: 600;
     margin-bottom: 0.5rem;
     color: hsl(var(--foreground));
+  }
+
+  .form-hint {
+    font-size: 0.8rem;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
   }
 
   .form-select,
@@ -781,6 +1105,159 @@
     font-family: inherit;
   }
 
+  /* 리치 에디터 스타일 */
+  .editor-toolbar {
+    background: hsl(var(--muted) / 0.3);
+    border: 1px solid hsl(var(--border));
+    border-bottom: none;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    padding: 0.5rem;
+  }
+
+  .toolbar-row {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 0.25rem 0;
+  }
+
+  .toolbar-row + .toolbar-row {
+    border-top: 1px solid hsl(var(--border));
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+  }
+
+  .toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0.25rem 0.5rem;
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-sm);
+    color: hsl(var(--foreground));
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .toolbar-btn:hover {
+    background: hsl(var(--primary) / 0.1);
+    border-color: hsl(var(--primary));
+  }
+
+  .toolbar-btn.active {
+    background: hsl(var(--primary));
+    color: white;
+    border-color: hsl(var(--primary));
+  }
+
+  .toolbar-divider {
+    width: 1px;
+    height: 24px;
+    background: hsl(var(--border));
+    margin: 0 0.5rem;
+  }
+
+  .toolbar-select {
+    padding: 0.25rem 0.5rem;
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-sm);
+    color: hsl(var(--foreground));
+    font-size: 0.875rem;
+    cursor: pointer;
+    min-width: 100px;
+  }
+
+  .toolbar-select-small {
+    min-width: 60px;
+  }
+
+  .toolbar-select:hover {
+    border-color: hsl(var(--primary));
+  }
+
+  .toolbar-select:focus {
+    outline: none;
+    border-color: hsl(var(--primary));
+  }
+
+  .toolbar-select option {
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    padding: 0.5rem;
+  }
+
+  .editor-content {
+    width: 100%;
+    min-height: 300px;
+    max-height: 500px;
+    padding: 1rem;
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    color: hsl(var(--foreground));
+    font-size: 1rem;
+    line-height: 1.6;
+    overflow-y: auto;
+    font-family: inherit;
+  }
+
+  .editor-content:focus {
+    outline: none;
+    border-color: hsl(var(--primary));
+  }
+
+  .editor-content:empty:before {
+    content: attr(placeholder);
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
+  }
+
+  /* 에디터 내부 요소 스타일 */
+  .editor-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+    margin: 0.5rem 0;
+  }
+
+  .editor-content a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+  }
+
+  .editor-content hr {
+    border: none;
+    border-top: 2px solid hsl(var(--border));
+    margin: 1rem 0;
+  }
+
+  .editor-content h1, .editor-content h2, .editor-content h3,
+  .editor-content h4, .editor-content h5, .editor-content h6 {
+    margin: 1rem 0 0.5rem;
+    font-weight: 700;
+  }
+
+  .editor-content h1 { font-size: 2rem; }
+  .editor-content h2 { font-size: 1.5rem; }
+  .editor-content h3 { font-size: 1.25rem; }
+
+  .editor-content p {
+    margin: 0.5rem 0;
+  }
+
+  .editor-content video {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+    margin: 0.5rem 0;
+  }
+
   .modal-footer {
     display: flex;
     justify-content: flex-end;
@@ -788,6 +1265,7 @@
     padding: 1.5rem;
     border-top: 1px solid hsl(var(--border));
   }
+
 
   @media (max-width: 1024px) {
     .content-grid {
@@ -812,6 +1290,37 @@
     
     .modal-content {
       max-width: 100%;
+      margin: 0.5rem;
+    }
+
+    .editor-toolbar {
+      padding: 0.25rem;
+    }
+
+    .toolbar-row {
+      gap: 0.125rem;
+    }
+
+    .toolbar-btn {
+      min-width: 28px;
+      height: 28px;
+      font-size: 0.75rem;
+      padding: 0.125rem 0.25rem;
+    }
+
+    .toolbar-select {
+      font-size: 0.75rem;
+      min-width: 80px;
+      padding: 0.25rem;
+    }
+
+    .toolbar-select-small {
+      min-width: 50px;
+    }
+
+    .editor-content {
+      min-height: 200px;
+      font-size: 0.875rem;
     }
   }
 </style>

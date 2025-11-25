@@ -15,7 +15,7 @@ PUBLIC_API_MODE=production
 
 ### 2. API 클라이언트 구조
 
-```
+```   
 src/lib/api/
 ├── index.ts              # 메인 진입점
 ├── backend-types.ts      # 타입 정의

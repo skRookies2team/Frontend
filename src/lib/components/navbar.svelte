@@ -96,8 +96,8 @@
   .navbar {
     position: sticky;
     top: 0;
-    background: hsl(var(--background));
-    border-bottom: 1px solid hsl(var(--border));
+    background: #000000;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 50;
     padding: 0.75rem 0;
   }
@@ -134,7 +134,7 @@
   }
 
   .nav-link {
-    color: hsl(var(--foreground));
+    color: #ffffff;
     text-decoration: none;
     font-weight: 600;
     font-size: 0.95rem;
@@ -175,17 +175,22 @@
   .search-input {
     width: 320px;
     padding: 0.625rem 2.5rem 0.625rem 1rem;
-    background: hsl(var(--muted));
-    border: 1px solid hsl(var(--border));
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: var(--radius-full);
     font-size: 0.9rem;
+    color: #ffffff;
     transition: all 0.2s;
+  }
+
+  .search-input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
   }
 
   .search-input:focus {
     outline: none;
     border-color: hsl(var(--primary));
-    background: hsl(var(--background));
+    background: rgba(255, 255, 255, 0.15);
   }
 
   .search-btn {
@@ -194,18 +199,22 @@
     padding: 0.375rem;
     background: none;
     border: none;
-    color: hsl(var(--muted-foreground));
+    color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
+  .search-btn:hover {
+    color: #ffffff;
+  }
+
   .profile-btn {
     padding: 0.375rem;
     background: none;
     border: none;
-    color: hsl(var(--foreground));
+    color: #ffffff;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -221,14 +230,14 @@
     display: flex;
     align-items: center;
     padding: 0.5rem 1rem;
-    background: hsl(var(--muted));
+    background: rgba(255, 255, 255, 0.1);
     border-radius: var(--radius-full);
   }
 
   .username {
     font-weight: 600;
     font-size: 0.875rem;
-    color: hsl(var(--foreground));
+    color: #ffffff;
   }
 
   @media (max-width: 768px) {
