@@ -11,6 +11,8 @@
   // 1단계: 소설 텍스트 입력
   let title = $state('');
   let novelText = $state('');
+  let uploadedFile = $state<File | null>(null);
+  let uploadProgress = $state(0);
   let uploading = $state(false);
   
   // 2단계: 등장인물 & 요약 (자동 추출)
@@ -69,7 +71,10 @@
   
   function canGoNext(): boolean {
     switch (currentStep) {
-      case 1: return novelText.length >= 100 && title.length > 0;
+      case 1: 
+        // 파일이 있거나 텍스트가 100자 이상 입력되어야 함
+        const hasValidInput = uploadedFile !== null || novelText.length >= 100;
+        return hasValidInput && title.length > 0;
       case 2: return characters.length > 0 && summary.length > 0;
       case 3: return selectedGaugeIds.length === 2;
       case 4: return true;
@@ -95,22 +100,50 @@
     console.log('uploadNovel 호출됨');
     console.log('canGoNext:', canGoNext());
     console.log('title:', title);
+    console.log('uploadedFile:', uploadedFile);
     console.log('novelText length:', novelText.length);
     
     if (!canGoNext()) {
-      alert('제목과 소설 텍스트를 입력해주세요 (최소 100자)');
+      alert('제목과 소설 파일 또는 텍스트를 입력해주세요');
       return;
     }
     
     uploading = true;
+    uploadProgress = 0;
     error = '';
     
     try {
-      console.log('API 호출 시작...');
-      const response = await api.story.uploadNovel({
-        title,
-        novelText
-      });
+      let response;
+      
+      // 파일이 있는 경우: S3 업로드 방식 사용
+      if (uploadedFile) {
+        console.log('S3 업로드 방식 사용...');
+        
+        // 1. S3에 파일 업로드
+        const fileKey = await api.upload.uploadStoryFile(uploadedFile, (progress) => {
+          uploadProgress = progress;
+          console.log(`업로드 진행률: ${progress.toFixed(1)}%`);
+        });
+        
+        console.log('S3 업로드 완료, fileKey:', fileKey);
+        
+        // 2. 백엔드에 분석 요청
+        response = await api.story.uploadNovelFromS3({
+          title,
+          description,
+          fileKey
+        });
+      } 
+      // 텍스트가 있는 경우: 기존 방식 사용
+      else if (novelText) {
+        console.log('텍스트 직접 전송 방식 사용...');
+        response = await api.story.uploadNovel({
+          title,
+          novelText
+        });
+      } else {
+        throw new Error('파일 또는 텍스트를 입력해주세요');
+      }
       
       console.log('업로드 성공:', response);
       storyId = response.storyId;
@@ -129,6 +162,7 @@
       }
     } finally {
       uploading = false;
+      uploadProgress = 0;
     }
   }
   
@@ -440,15 +474,38 @@
     const file = input.files?.[0];
     if (!file) return;
     
+    // 파일 타입 검증 (.txt, .pdf, .doc, .docx)
+    const allowedTypes = ['.txt', '.pdf', '.doc', '.docx'];
+    const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
+    
+    if (!allowedTypes.includes(fileExt)) {
+      alert('지원하는 파일 형식: .txt, .pdf, .doc, .docx');
+      input.value = '';
+      return;
+    }
+    
+    // 파일 크기 검증 (10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert('파일 크기는 10MB 이하여야 합니다.');
+      input.value = '';
+      return;
+    }
+    
     try {
-      const content = await file.text();
-      novelText = content;
+      uploadedFile = file;
+      novelText = ''; // 파일 선택 시 텍스트 입력 초기화
+      
+      // 제목이 없으면 파일명으로 자동 설정
       if (!title) {
-        title = file.name.replace('.txt', '');
+        title = file.name.replace(/\.(txt|pdf|doc|docx)$/i, '');
       }
+      
+      console.log('파일 선택됨:', file.name, `(${(file.size / 1024).toFixed(1)} KB)`);
     } catch (err) {
-      console.error('파일 읽기 실패:', err);
-      error = '파일을 읽을 수 없습니다.';
+      console.error('파일 처리 실패:', err);
+      error = '파일을 처리할 수 없습니다.';
+      uploadedFile = null;
     }
   }
   
@@ -551,6 +608,8 @@
     storyId = '';
     title = '';
     novelText = '';
+    uploadedFile = null;
+    uploadProgress = 0;
     description = '';
     summary = '';
     characters = [];
@@ -640,16 +699,52 @@
             </div>
 
             <div class="form-group">
-              <label class="form-label">소설 본문 *</label>
+              <label class="form-label">파일 업로드 (권장)</label>
+              <p class="field-hint">
+                지원 형식: .txt, .pdf, .doc, .docx (최대 10MB)
+              </p>
+              <input
+                type="file"
+                accept=".txt,.pdf,.doc,.docx"
+                class="file-input"
+                onchange={handleFileUpload}
+                disabled={uploading}
+              />
+              {#if uploadedFile}
+                <div class="file-info">
+                  <span class="file-icon">📄</span>
+                  <span class="file-name">{uploadedFile.name}</span>
+                  <span class="file-size">({(uploadedFile.size / 1024).toFixed(1)} KB)</span>
+                  <button 
+                    type="button" 
+                    class="file-remove"
+                    onclick={() => { uploadedFile = null; }}
+                    disabled={uploading}
+                  >
+                    ✕
+                  </button>
+                </div>
+              {/if}
+            </div>
+
+            <div class="divider-or">
+              <span>또는</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">텍스트 직접 입력</label>
               <textarea
                 class="form-textarea"
                 bind:value={novelText}
                 placeholder="소설 전체 텍스트를 여기에 붙여넣기 하세요...
 
 최소 100자 이상 입력해주세요. 더 긴 텍스트일수록 더 풍부한 스토리가 생성됩니다."
+                disabled={uploadedFile !== null || uploading}
               />
               <div class="textarea-info">
-                {#if novelText.length > 0}
+                {#if uploadedFile}
+                  <span class="text-muted">파일이 선택되어 텍스트 입력이 비활성화되었습니다</span>
+                {:else if novelText.length > 0}
                   <span class="text-success">
                     ✓ {novelText.length.toLocaleString()}자 입력됨
                     {#if novelText.length < 1000}
@@ -662,16 +757,6 @@
               </div>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">또는 파일 업로드</label>
-              <input
-                type="file"
-                accept=".txt"
-                class="file-input"
-                onchange={handleFileUpload}
-              />
-            </div>
-
             {#if error}
               <div class="error-banner">
                 ❌ {error}
@@ -680,7 +765,22 @@
             
             {#if uploading}
               <div class="info-banner">
-                ⏳ 소설을 업로드하고 있습니다...
+                <div class="upload-status">
+                  <div class="upload-icon">⏳</div>
+                  <div class="upload-info">
+                    {#if uploadProgress > 0 && uploadProgress < 100}
+                      <p class="upload-text">S3에 파일 업로드 중...</p>
+                      <div class="upload-progress-bar">
+                        <div class="upload-progress-fill" style="width: {uploadProgress}%"></div>
+                      </div>
+                      <p class="upload-percentage">{uploadProgress.toFixed(1)}%</p>
+                    {:else if uploadProgress === 100}
+                      <p class="upload-text">업로드 완료! 분석을 시작합니다...</p>
+                    {:else}
+                      <p class="upload-text">소설을 업로드하고 있습니다...</p>
+                    {/if}
+                  </div>
+                </div>
               </div>
             {:else if canGoNext()}
               <div class="success-banner">
@@ -1215,9 +1315,148 @@
     border-color: hsl(var(--primary));
   }
 
+  .form-textarea:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: hsl(var(--muted) / 0.3);
+  }
+
   .textarea-info {
     margin-top: 0.5rem;
     font-size: 0.875rem;
+  }
+
+  /* 파일 업로드 */
+  .file-info {
+    margin-top: 0.75rem;
+    padding: 1rem;
+    background: hsl(var(--muted) / 0.3);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .file-icon {
+    font-size: 1.5rem;
+  }
+
+  .file-name {
+    flex: 1;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .file-size {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .file-remove {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--background));
+    color: hsl(var(--muted-foreground));
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+
+  .file-remove:hover:not(:disabled) {
+    background: hsl(0 84.2% 60.2% / 0.1);
+    border-color: hsl(0 84.2% 60.2%);
+    color: hsl(0 84.2% 60.2%);
+  }
+
+  .file-remove:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* 구분선 */
+  .divider-or {
+    position: relative;
+    text-align: center;
+    margin: 2rem 0;
+  }
+
+  .divider-or::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: hsl(var(--border));
+    z-index: 0;
+  }
+
+  .divider-or span {
+    position: relative;
+    z-index: 1;
+    padding: 0 1rem;
+    background: hsl(var(--card));
+    color: hsl(var(--muted-foreground));
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  /* 업로드 진행률 */
+  .upload-status {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .upload-icon {
+    font-size: 2rem;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .upload-info {
+    flex: 1;
+  }
+
+  .upload-text {
+    font-weight: 600;
+    color: hsl(var(--primary));
+    margin-bottom: 0.5rem;
+  }
+
+  .upload-progress-bar {
+    width: 100%;
+    height: 0.5rem;
+    background: hsl(var(--muted));
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+  }
+
+  .upload-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)));
+    transition: width 0.3s ease;
+  }
+
+  .upload-percentage {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: hsl(var(--primary));
+    text-align: right;
   }
 
   .text-success {

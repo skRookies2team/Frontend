@@ -407,6 +407,43 @@ export enum PostType {
   NOTICE = "NOTICE"
 }
 
+// ==================== File Upload ====================
+
+export interface PresignedUrlResponseDto {
+  uploadUrl: string;
+  fileKey: string;
+  expiresIn: number;
+  method: string;
+}
+
+export interface S3UploadRequestDto {
+  title: string;
+  description?: string;
+  fileKey: string;
+}
+
+export interface ProfileImageUploadResponseDto {
+  profileImageUrl: string;
+  message: string;
+}
+
+export interface MediaDto {
+  mediaId: number;
+  mediaType: string;
+  mediaUrl: string;
+  mediaOrder: number;
+}
+
+export interface PostMediaUploadResponseDto {
+  mediaId: number;
+  mediaType: string;
+  mediaUrl: string;
+  mediaKey: string;
+  mediaOrder: number;
+  fileSize: number;
+  message: string;
+}
+
 // ==================== Health Check ====================
 
 export interface HealthCheckResponse {

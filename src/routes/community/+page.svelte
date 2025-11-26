@@ -18,6 +18,11 @@
   let postType = $state<PostType>(PostType.GENERAL);
   let submitting = $state(false);
   
+  // 파일 업로드
+  let uploading = $state(false);
+  let uploadProgress = $state(0);
+  let uploadingFileName = $state('');
+  
   
   // 에디터 설정
   let fontSize = $state(15);
@@ -104,6 +109,11 @@
   }
   
   function closeWriteModal() {
+    if (uploading) {
+      alert('파일 업로드가 진행 중입니다. 잠시만 기다려주세요.');
+      return;
+    }
+    
     showWriteModal = false;
     postTitle = '';
     postContent = '';
@@ -119,6 +129,11 @@
     isItalic = false;
     isUnderline = false;
     isStrikethrough = false;
+    
+    // 업로드 상태 초기화
+    uploading = false;
+    uploadProgress = 0;
+    uploadingFileName = '';
   }
   
   // 에디터 기능 함수들
@@ -205,43 +220,113 @@
     }
   }
   
-  function insertImageFromEditor() {
+  async function insertImageFromEditor() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
     input.multiple = true;
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const files = (e.target as HTMLInputElement).files;
-      if (files) {
-        Array.from(files).forEach(file => {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            const img = `<img src="${event.target?.result}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0;" />`;
-            execCommand('insertHTML', img);
-          };
-          reader.readAsDataURL(file);
-        });
+      if (!files || files.length === 0) return;
+      
+      uploading = true;
+      
+      try {
+        // 여러 파일을 순차적으로 업로드
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          uploadingFileName = file.name;
+          uploadProgress = 0;
+          
+          // 파일 크기 검증 (5MB)
+          if (file.size > 5 * 1024 * 1024) {
+            alert(`${file.name}은(는) 5MB를 초과합니다.`);
+            continue;
+          }
+          
+          console.log(`이미지 업로드 시작: ${file.name}`);
+          
+          // S3에 업로드
+          const fileKey = await api.upload.uploadImageFile(file, (progress) => {
+            uploadProgress = progress;
+          });
+          
+          console.log(`이미지 업로드 완료: ${fileKey}`);
+          
+          // S3 URL 생성 (다운로드 URL 받기)
+          const imageUrl = await api.upload.getDownloadUrl(fileKey);
+          
+          // 에디터에 이미지 삽입
+          const img = `<img src="${imageUrl}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0;" alt="${file.name}" />`;
+          execCommand('insertHTML', img);
+          
+          console.log(`에디터에 이미지 삽입 완료`);
+        }
+        
+        alert('이미지 업로드가 완료되었습니다!');
+      } catch (err) {
+        console.error('이미지 업로드 실패:', err);
+        alert('이미지 업로드에 실패했습니다.');
+      } finally {
+        uploading = false;
+        uploadProgress = 0;
+        uploadingFileName = '';
       }
     };
     input.click();
   }
   
-  function insertVideoFromEditor() {
+  async function insertVideoFromEditor() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'video/*';
     input.multiple = true;
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const files = (e.target as HTMLInputElement).files;
-      if (files) {
-        Array.from(files).forEach(file => {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            const video = `<video src="${event.target?.result}" controls style="max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0;"></video>`;
-            execCommand('insertHTML', video);
-          };
-          reader.readAsDataURL(file);
-        });
+      if (!files || files.length === 0) return;
+      
+      uploading = true;
+      
+      try {
+        // 여러 파일을 순차적으로 업로드
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          uploadingFileName = file.name;
+          uploadProgress = 0;
+          
+          // 파일 크기 검증 (100MB)
+          if (file.size > 100 * 1024 * 1024) {
+            alert(`${file.name}은(는) 100MB를 초과합니다.`);
+            continue;
+          }
+          
+          console.log(`동영상 업로드 시작: ${file.name}`);
+          
+          // S3에 업로드
+          const fileKey = await api.upload.uploadVideoFile(file, (progress) => {
+            uploadProgress = progress;
+          });
+          
+          console.log(`동영상 업로드 완료: ${fileKey}`);
+          
+          // S3 URL 생성 (다운로드 URL 받기)
+          const videoUrl = await api.upload.getDownloadUrl(fileKey);
+          
+          // 에디터에 동영상 삽입
+          const video = `<video src="${videoUrl}" controls style="max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0;"></video>`;
+          execCommand('insertHTML', video);
+          
+          console.log(`에디터에 동영상 삽입 완료`);
+        }
+        
+        alert('동영상 업로드가 완료되었습니다!');
+      } catch (err) {
+        console.error('동영상 업로드 실패:', err);
+        alert('동영상 업로드에 실패했습니다.');
+      } finally {
+        uploading = false;
+        uploadProgress = 0;
+        uploadingFileName = '';
       }
     };
     input.click();
@@ -259,12 +344,13 @@
       return;
     }
     
+    if (uploading) {
+      alert('파일 업로드가 진행 중입니다. 잠시만 기다려주세요.');
+      return;
+    }
+    
     submitting = true;
     try {
-      // TODO: 나중에 이미지/동영상 업로드 API 연동
-      // 에디터 내에 삽입된 이미지/동영상은 Base64로 인코딩되어 있음
-      // 필요시 별도 처리 가능
-      
       await api.post.createPost({
         title: postTitle,
         content: editorContent,
@@ -491,10 +577,10 @@
           <div class="editor-toolbar">
             <!-- 첫 번째 줄: 미디어 및 기능 버튼 -->
             <div class="toolbar-row">
-              <button type="button" class="toolbar-btn" onclick={insertImageFromEditor} title="사진">
+              <button type="button" class="toolbar-btn" onclick={insertImageFromEditor} title="사진" disabled={uploading}>
                 📷
               </button>
-              <button type="button" class="toolbar-btn" onclick={insertVideoFromEditor} title="동영상">
+              <button type="button" class="toolbar-btn" onclick={insertVideoFromEditor} title="동영상" disabled={uploading}>
                 🎥
               </button>
               <button type="button" class="toolbar-btn" onclick={insertLink} title="링크">
@@ -651,15 +737,33 @@
             bind:this={contentEditableElement}
             placeholder="내용을 입력하세요"
           ></div>
+          
+          <!-- 업로드 진행률 표시 -->
+          {#if uploading}
+            <div class="upload-progress-container">
+              <div class="upload-status">
+                <div class="upload-icon">⏳</div>
+                <div class="upload-info">
+                  <p class="upload-text">
+                    {uploadingFileName} 업로드 중...
+                  </p>
+                  <div class="upload-progress-bar">
+                    <div class="upload-progress-fill" style="width: {uploadProgress}%"></div>
+                  </div>
+                  <p class="upload-percentage">{uploadProgress.toFixed(1)}%</p>
+                </div>
+              </div>
+            </div>
+          {/if}
         </div>
       </div>
       
       <div class="modal-footer">
-        <Button variant="outline" onclick={closeWriteModal} disabled={submitting}>
+        <Button variant="outline" onclick={closeWriteModal} disabled={submitting || uploading}>
           취소
         </Button>
-        <Button onclick={submitPost} disabled={submitting}>
-          {submitting ? '작성 중...' : '작성하기'}
+        <Button onclick={submitPost} disabled={submitting || uploading}>
+          {uploading ? '업로드 중...' : submitting ? '작성 중...' : '작성하기'}
         </Button>
       </div>
     </div>
@@ -1155,6 +1259,11 @@
     border-color: hsl(var(--primary));
   }
 
+  .toolbar-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   .toolbar-divider {
     width: 1px;
     height: 24px;
@@ -1256,6 +1365,65 @@
     height: auto;
     border-radius: var(--radius-md);
     margin: 0.5rem 0;
+  }
+
+  /* 업로드 진행률 */
+  .upload-progress-container {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: hsl(var(--muted) / 0.3);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+  }
+
+  .upload-status {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .upload-icon {
+    font-size: 2rem;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .upload-info {
+    flex: 1;
+  }
+
+  .upload-text {
+    font-weight: 600;
+    color: hsl(var(--primary));
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .upload-progress-bar {
+    width: 100%;
+    height: 0.5rem;
+    background: hsl(var(--muted));
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+  }
+
+  .upload-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)));
+    transition: width 0.3s ease;
+  }
+
+  .upload-percentage {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: hsl(var(--primary));
+    text-align: right;
+    margin: 0;
   }
 
   .modal-footer {

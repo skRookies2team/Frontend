@@ -164,6 +164,49 @@ class HttpClient {
   async delete<T>(path: string, config?: RequestConfig): Promise<T> {
     return this.request<T>(path, { ...config, method: 'DELETE' });
   }
+
+  /**
+   * Upload file directly to S3 using presigned URL
+   */
+  async uploadToS3(
+    presignedUrl: string,
+    file: File | Blob,
+    onProgress?: (progress: number) => void
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+
+      // Track upload progress
+      if (onProgress) {
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const progress = (e.loaded / e.total) * 100;
+            onProgress(progress);
+          }
+        });
+      }
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`S3 Upload failed with status ${xhr.status}`));
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new Error('S3 Upload failed'));
+      });
+
+      xhr.addEventListener('abort', () => {
+        reject(new Error('S3 Upload aborted'));
+      });
+
+      xhr.open('PUT', presignedUrl);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.send(file);
+    });
+  }
 }
 
 // Singleton instance
