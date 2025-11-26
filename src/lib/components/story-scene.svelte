@@ -89,9 +89,20 @@
     min-height: 600px;
     border-radius: var(--radius-xl);
     overflow: hidden;
-    background: hsl(var(--card));
+    background: linear-gradient(135deg, hsl(240 12% 12%), hsl(240 12% 10%));
     border: 1px solid hsl(var(--border));
-    animation: fadeIn 0.3s ease;
+    box-shadow: var(--glow-card);
+    animation: fadeIn 0.6s ease;
+  }
+  
+  .story-scene::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-xl);
+    background: linear-gradient(135deg, hsla(250 100% 70% / 0.08), transparent);
+    pointer-events: none;
+    z-index: 1;
   }
   
   @keyframes fadeIn {
@@ -156,10 +167,13 @@
   
   .story-text {
     font-size: 1.25rem;
-    line-height: 1.8;
-    color: hsl(var(--foreground));
+    line-height: 1.9;
+    color: hsl(0 0% 95%);
     max-width: 700px;
     white-space: pre-line;
+    text-shadow: 0 2px 8px hsla(0 0% 0% / 0.5);
+    font-weight: 400;
+    letter-spacing: 0.01em;
   }
   
   .character-events {
@@ -170,12 +184,17 @@
   }
   
   .character-event {
-    padding: 1rem 1.25rem;
-    background: hsla(var(--card) / 0.8);
-    border-left: 3px solid hsl(var(--primary));
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(
+      90deg,
+      hsla(250 100% 70% / 0.15),
+      hsla(240 12% 12% / 0.9)
+    );
+    border-left: 4px solid hsl(var(--primary));
     border-radius: var(--radius-md);
-    backdrop-filter: blur(10px);
-    animation: slideInEvent 0.5s ease;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 4px 16px hsla(0 0% 0% / 0.3);
+    animation: slideInEvent 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   @keyframes slideInEvent {

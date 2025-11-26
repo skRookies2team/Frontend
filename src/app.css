@@ -3,33 +3,57 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* <CHANGE> Dark, immersive storytelling theme with high contrast */
-  --background: hsl(220 18% 8%);
-  --foreground: hsl(0 0% 95%);
-  --card: hsl(220 18% 12%);
-  --card-foreground: hsl(0 0% 95%);
-  --popover: hsl(220 18% 10%);
-  --popover-foreground: hsl(0 0% 95%);
-  --primary: hsl(210 100% 65%);
-  --primary-foreground: hsl(220 18% 8%);
-  --secondary: hsl(220 15% 20%);
-  --secondary-foreground: hsl(0 0% 95%);
-  --muted: hsl(220 15% 18%);
-  --muted-foreground: hsl(0 0% 60%);
-  --accent: hsl(160 60% 50%);
-  --accent-foreground: hsl(220 18% 8%);
-  --destructive: hsl(0 70% 55%);
-  --destructive-foreground: hsl(0 0% 98%);
-  --border: hsl(220 15% 22%);
-  --input: hsl(220 15% 18%);
-  --ring: hsl(210 100% 65%);
-  --radius: 0.75rem;
+  /* <CHANGE> Elegant Dark Theme - Luxurious storytelling experience */
+  --background: hsl(240 15% 6%);
+  --foreground: hsl(0 0% 98%);
+  --card: hsl(240 12% 10%);
+  --card-foreground: hsl(0 0% 98%);
+  --popover: hsl(240 12% 8%);
+  --popover-foreground: hsl(0 0% 98%);
+  
+  /* Gradient primary colors */
+  --primary: hsl(250 100% 70%);
+  --primary-dark: hsl(280 100% 65%);
+  --primary-foreground: hsl(0 0% 100%);
+  
+  /* Accent colors */
+  --secondary: hsl(240 10% 18%);
+  --secondary-foreground: hsl(0 0% 98%);
+  --muted: hsl(240 10% 15%);
+  --muted-foreground: hsl(0 0% 65%);
+  --accent: hsl(45 100% 65%);
+  --accent-secondary: hsl(320 85% 65%);
+  --accent-foreground: hsl(240 15% 6%);
+  
+  /* Semantic colors */
+  --destructive: hsl(0 85% 60%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --success: hsl(160 75% 55%);
+  --warning: hsl(45 100% 65%);
+  
+  /* Border & Input */
+  --border: hsl(240 15% 20%);
+  --border-bright: hsl(250 50% 40%);
+  --input: hsl(240 12% 15%);
+  --ring: hsl(250 100% 70%);
+  --radius: 0.875rem;
 
-  /* <CHANGE> Custom story UI tokens */
-  --story-overlay: hsla(220 18% 8% / 0.85);
-  --gauge-positive: hsl(160 60% 50%);
-  --gauge-negative: hsl(0 70% 55%);
-  --choice-hover: hsl(210 100% 70%);
+  /* <CHANGE> Custom story UI tokens - Enhanced */
+  --story-overlay: hsla(240 15% 6% / 0.9);
+  --gauge-positive: hsl(160 75% 55%);
+  --gauge-negative: hsl(0 85% 60%);
+  --choice-hover: hsl(250 100% 75%);
+  
+  /* Gradient tokens */
+  --gradient-primary: linear-gradient(135deg, hsl(250 100% 70%), hsl(280 100% 65%));
+  --gradient-accent: linear-gradient(135deg, hsl(45 100% 65%), hsl(35 100% 60%));
+  --gradient-card: linear-gradient(135deg, hsl(240 12% 12%), hsl(240 12% 8%));
+  --gradient-border: linear-gradient(135deg, hsl(250 70% 50%), hsl(280 70% 50%));
+  
+  /* Glow effects */
+  --glow-primary: 0 0 20px hsla(250 100% 70% / 0.3);
+  --glow-accent: 0 0 20px hsla(45 100% 65% / 0.3);
+  --glow-card: 0 8px 32px hsla(0 0% 0% / 0.4);
 }
 
 .dark {
@@ -68,5 +92,75 @@
   }
   body {
     @apply bg-background text-foreground;
+    position: relative;
+    overflow-x: hidden;
+  }
+  
+  /* Elegant background with subtle pattern */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+      radial-gradient(circle at 20% 20%, hsla(250 100% 70% / 0.08) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, hsla(280 100% 65% / 0.08) 0%, transparent 50%),
+      radial-gradient(circle at 50% 50%, hsla(45 100% 65% / 0.03) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+      repeating-linear-gradient(0deg, transparent, transparent 2px, hsla(250 50% 50% / 0.02) 2px, hsla(250 50% 50% / 0.02) 4px);
+    pointer-events: none;
+    z-index: 0;
+  }
+}
+
+/* Smooth animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: var(--glow-card);
+  }
+  50% {
+    box-shadow: var(--glow-card), var(--glow-primary);
   }
 }

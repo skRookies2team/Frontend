@@ -96,8 +96,13 @@
   .navbar {
     position: sticky;
     top: 0;
-    background: #000000;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: hsla(240 15% 6% / 0.8);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border-bottom: 1px solid hsla(250 50% 50% / 0.2);
+    box-shadow: 
+      0 4px 24px hsla(0 0% 0% / 0.2),
+      inset 0 1px 0 hsla(255 255 255 / 0.05);
     z-index: 50;
     padding: 0.75rem 0;
   }
@@ -119,13 +124,22 @@
   }
 
   .brand {
-    font-size: 1.5rem;
-    font-weight: 800;
-    background: linear-gradient(135deg, #ef4444, #f97316);
+    font-size: 1.625rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, hsl(250 100% 70%), hsl(280 100% 65%), hsl(45 100% 65%));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     text-decoration: none;
+    letter-spacing: -0.02em;
+    position: relative;
+    transition: all 0.3s ease;
+    filter: drop-shadow(0 0 8px hsla(250 100% 70% / 0.3));
+  }
+  
+  .brand:hover {
+    filter: drop-shadow(0 0 16px hsla(250 100% 70% / 0.5));
+    transform: scale(1.05);
   }
 
   .nav-menu {
@@ -134,30 +148,45 @@
   }
 
   .nav-link {
-    color: #ffffff;
+    color: hsl(0 0% 85%);
     text-decoration: none;
     font-weight: 600;
     font-size: 0.95rem;
-    transition: color 0.2s;
+    transition: all 0.3s ease;
     position: relative;
+    padding: 0.5rem 0;
+  }
+  
+  .nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 2px;
+    background: var(--gradient-primary);
+    transition: width 0.3s ease;
+    border-radius: 2px;
   }
 
   .nav-link:hover {
-    color: hsl(var(--primary));
+    color: hsl(0 0% 100%);
+    text-shadow: 0 0 8px hsla(250 100% 70% / 0.3);
+  }
+  
+  .nav-link:hover::after {
+    width: 100%;
   }
 
   .nav-link.active {
-    color: hsl(var(--primary));
+    color: hsl(0 0% 100%);
+    font-weight: 700;
   }
 
   .nav-link.active::after {
-    content: '';
-    position: absolute;
-    bottom: -0.75rem;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: hsl(var(--primary));
+    width: 100%;
+    box-shadow: 0 0 8px hsla(250 100% 70% / 0.5);
   }
 
   .nav-right {
@@ -174,23 +203,28 @@
 
   .search-input {
     width: 320px;
-    padding: 0.625rem 2.5rem 0.625rem 1rem;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.75rem 2.75rem 0.75rem 1.25rem;
+    background: hsla(240 15% 15% / 0.6);
+    border: 1px solid hsla(250 50% 50% / 0.3);
     border-radius: var(--radius-full);
     font-size: 0.9rem;
-    color: #ffffff;
-    transition: all 0.2s;
+    color: hsl(0 0% 100%);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(8px);
   }
 
   .search-input::placeholder {
-    color: rgba(255, 255, 255, 0.5);
+    color: hsl(0 0% 60%);
   }
 
   .search-input:focus {
     outline: none;
     border-color: hsl(var(--primary));
-    background: rgba(255, 255, 255, 0.15);
+    background: hsla(240 15% 18% / 0.8);
+    box-shadow: 
+      0 0 0 3px hsla(250 100% 70% / 0.1),
+      0 4px 12px hsla(0 0% 0% / 0.2);
+    transform: translateY(-1px);
   }
 
   .search-btn {
@@ -229,15 +263,25 @@
   .user-info {
     display: flex;
     align-items: center;
-    padding: 0.5rem 1rem;
-    background: rgba(255, 255, 255, 0.1);
+    padding: 0.625rem 1.25rem;
+    background: linear-gradient(135deg, hsla(250 100% 70% / 0.15), hsla(280 100% 65% / 0.15));
+    border: 1px solid hsla(250 50% 50% / 0.3);
     border-radius: var(--radius-full);
+    backdrop-filter: blur(8px);
+    transition: all 0.3s ease;
+  }
+  
+  .user-info:hover {
+    background: linear-gradient(135deg, hsla(250 100% 70% / 0.25), hsla(280 100% 65% / 0.25));
+    border-color: hsla(250 50% 50% / 0.5);
+    box-shadow: 0 4px 12px hsla(250 100% 70% / 0.2);
   }
 
   .username {
-    font-weight: 600;
+    font-weight: 700;
     font-size: 0.875rem;
-    color: #ffffff;
+    color: hsl(0 0% 100%);
+    text-shadow: 0 0 8px hsla(250 100% 70% / 0.3);
   }
 
   @media (max-width: 768px) {

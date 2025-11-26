@@ -231,8 +231,13 @@
   .game-header {
     position: sticky;
     top: 0;
-    background: hsl(var(--card));
-    border-bottom: 1px solid hsl(var(--border));
+    background: hsla(240 12% 10% / 0.9);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border-bottom: 1px solid hsla(250 50% 50% / 0.2);
+    box-shadow: 
+      0 4px 24px hsla(0 0% 0% / 0.3),
+      inset 0 1px 0 hsla(255 255 255 / 0.05);
     padding: 1rem 0;
     z-index: 40;
   }
@@ -271,12 +276,17 @@
   }
 
   .game-title {
-    font-size: 1.25rem;
-    font-weight: 700;
+    font-size: 1.375rem;
+    font-weight: 800;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     margin: 0;
+    background: linear-gradient(135deg, hsl(0 0% 100%), hsl(0 0% 80%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.02em;
   }
 
   .game-progress {
@@ -320,24 +330,67 @@
     align-items: center;
     justify-content: center;
     min-height: 500px;
-    background: hsl(var(--card));
+    background: linear-gradient(135deg, hsl(240 12% 12%), hsl(240 12% 10%));
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius-xl);
-    gap: 1.5rem;
+    box-shadow: var(--glow-card);
+    gap: 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .loading-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, hsla(250 100% 70% / 0.1), transparent 70%);
+    animation: pulse-bg 2s ease-in-out infinite;
+  }
+  
+  @keyframes pulse-bg {
+    0%, 100% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 1;
+    }
   }
 
   .spinner {
-    width: 48px;
-    height: 48px;
-    border: 4px solid hsl(var(--muted));
+    width: 64px;
+    height: 64px;
+    border: 5px solid hsl(var(--muted));
     border-top-color: hsl(var(--primary));
+    border-right-color: hsl(var(--accent));
     border-radius: 50%;
-    animation: spin 1s linear infinite;
+    animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+    box-shadow: 
+      0 0 20px hsla(250 100% 70% / 0.3),
+      inset 0 0 10px hsla(250 100% 70% / 0.2);
+    position: relative;
+    z-index: 1;
   }
 
   .loading-text {
-    font-size: 1.125rem;
-    color: hsl(var(--muted-foreground));
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+    position: relative;
+    z-index: 1;
+    background: linear-gradient(135deg, hsl(0 0% 100%), hsl(0 0% 70%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: pulse-text 2s ease-in-out infinite;
+  }
+  
+  @keyframes pulse-text {
+    0%, 100% {
+      opacity: 0.7;
+    }
+    50% {
+      opacity: 1;
+    }
   }
 
   @keyframes spin {
@@ -351,16 +404,38 @@
   }
 
   .sidebar-section {
-    background: hsl(var(--card));
+    position: relative;
+    background: linear-gradient(135deg, hsl(240 12% 12%), hsl(240 12% 10%));
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius-lg);
     padding: 1.5rem;
+    box-shadow: var(--glow-card);
+    transition: all 0.3s ease;
+  }
+  
+  .sidebar-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, hsla(250 100% 70% / 0.05), transparent);
+    pointer-events: none;
+  }
+  
+  .sidebar-section:hover {
+    border-color: hsl(var(--border-bright));
+    box-shadow: var(--glow-card), var(--glow-primary);
   }
 
   .sidebar-title {
-    font-size: 1rem;
-    font-weight: 700;
+    font-size: 1.125rem;
+    font-weight: 800;
     margin-bottom: 1rem;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.01em;
   }
 
   .sidebar-hint {

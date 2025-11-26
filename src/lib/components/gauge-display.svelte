@@ -28,19 +28,26 @@
 
 <style>
   .gauge-container {
-    padding: 1rem;
-    background: hsl(var(--card));
+    padding: 1.25rem;
+    background: linear-gradient(135deg, hsl(240 12% 13%), hsl(240 12% 11%));
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius-lg);
+    box-shadow: inset 0 1px 0 hsla(255 255 255 / 0.05);
+    transition: all 0.3s ease;
+  }
+  
+  .gauge-container:hover {
+    border-color: hsl(var(--border-bright));
   }
   
   .gauge-track {
     position: relative;
     width: 100%;
-    height: 8px;
+    height: 10px;
     background: hsl(var(--muted));
     border-radius: 999px;
-    overflow: hidden;
+    overflow: visible;
+    box-shadow: inset 0 2px 4px hsla(0 0% 0% / 0.3);
   }
   
   .gauge-fill {
@@ -53,19 +60,38 @@
       hsl(var(--primary)), 
       hsl(var(--gauge-positive))
     );
-    transition: width 0.5s ease;
+    border-radius: 999px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 12px hsla(250 100% 70% / 0.4);
   }
   
   .gauge-marker {
     position: absolute;
     top: 50%;
-    width: 16px;
-    height: 16px;
-    background: hsl(var(--foreground));
-    border: 2px solid hsl(var(--background));
+    width: 20px;
+    height: 20px;
+    background: linear-gradient(135deg, hsl(0 0% 100%), hsl(0 0% 90%));
+    border: 3px solid hsl(var(--background));
     border-radius: 999px;
     transform: translate(-50%, -50%);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    transition: left 0.5s ease;
+    box-shadow: 
+      0 4px 12px rgba(0, 0, 0, 0.4),
+      0 0 0 2px hsla(250 100% 70% / 0.3);
+    transition: left 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.4),
+        0 0 0 2px hsla(250 100% 70% / 0.3);
+    }
+    50% {
+      box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.4),
+        0 0 0 4px hsla(250 100% 70% / 0.5),
+        0 0 12px hsla(250 100% 70% / 0.4);
+    }
   }
 </style>

@@ -40,19 +40,51 @@
 <style>
   .character-card {
     width: 100%;
-    padding: 1.25rem;
-    background: hsl(var(--card));
+    padding: 1.5rem;
+    background: linear-gradient(135deg, hsl(240 12% 13%), hsl(240 12% 11%));
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius-lg);
     text-align: left;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .character-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-lg);
+    background: var(--gradient-border);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  
+  .character-card::after {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    border-radius: calc(var(--radius-lg) - 1px);
+    background: linear-gradient(135deg, hsl(240 12% 13%), hsl(240 12% 11%));
+    z-index: 0;
+  }
+  
+  .character-card > * {
+    position: relative;
+    z-index: 1;
   }
   
   .character-card:hover {
     border-color: hsl(var(--primary));
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    transform: translateY(-2px);
+    box-shadow: 
+      0 8px 24px rgba(0, 0, 0, 0.3),
+      0 0 0 1px hsla(250 100% 70% / 0.2);
+    transform: translateY(-4px) scale(1.02);
+  }
+  
+  .character-card:hover::before {
+    opacity: 1;
   }
   
   .stats-row {
@@ -60,24 +92,26 @@
     gap: 2rem;
     margin-top: 1rem;
     padding-top: 1rem;
-    border-top: 1px solid hsl(var(--border));
+    border-top: 1px solid hsla(250 50% 50% / 0.2);
   }
   
   .stat {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.375rem;
   }
   
   .stat-label {
     font-size: 0.75rem;
     color: hsl(var(--muted-foreground));
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
+    font-weight: 700;
   }
   
   .stat-value {
-    font-size: 1.125rem;
-    font-weight: 600;
+    font-size: 1.25rem;
+    font-weight: 800;
+    text-shadow: 0 0 8px currentColor;
   }
 </style>
