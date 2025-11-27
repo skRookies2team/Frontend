@@ -15,8 +15,12 @@
   let commentContent = $state('');
   let submitting = $state(false);
   let replyTo: number | null = $state(null);
+  let isLoggedIn = $state(false);
   
   onMount(() => {
+    // 로그인 상태 확인
+    isLoggedIn = api.auth.isAuthenticated();
+    
     loadPost();
     loadComments();
   });
@@ -46,6 +50,13 @@
   async function handleLike() {
     if (!post) return;
     
+    // 로그인 체크
+    if (!isLoggedIn) {
+      alert('로그인이 필요합니다.');
+      goto('/login');
+      return;
+    }
+    
     try {
       await api.post.toggleLike(postId);
       await loadPost();
@@ -57,6 +68,13 @@
   
   async function handleBookmark() {
     if (!post) return;
+    
+    // 로그인 체크
+    if (!isLoggedIn) {
+      alert('로그인이 필요합니다.');
+      goto('/login');
+      return;
+    }
     
     try {
       await api.post.toggleBookmark(postId);
@@ -73,8 +91,8 @@
       return;
     }
     
-    // 로그인 체크
-    if (!api.auth.isAuthenticated()) {
+    // 로그인 체크 (이중 체크)
+    if (!isLoggedIn) {
       alert('로그인이 필요합니다.');
       goto('/login');
       return;
@@ -99,6 +117,13 @@
   }
   
   async function handleCommentLike(commentId: number) {
+    // 로그인 체크
+    if (!isLoggedIn) {
+      alert('로그인이 필요합니다.');
+      goto('/login');
+      return;
+    }
+    
     try {
       await api.comment.toggleLike(commentId);
       await loadComments();
@@ -108,6 +133,13 @@
   }
   
   function handleReply(commentId: number, authorName: string) {
+    // 로그인 체크
+    if (!isLoggedIn) {
+      alert('댓글 작성은 로그인이 필요합니다.');
+      goto('/login');
+      return;
+    }
+    
     replyTo = commentId;
     commentContent = `@${authorName} `;
   }
@@ -208,25 +240,36 @@
         
         <!-- 댓글 작성 -->
         <div class="comment-write">
-          {#if replyTo !== null}
-            <div class="reply-indicator">
-              답글 작성 중
-              <button onclick={cancelReply}>취소</button>
+          {#if !isLoggedIn}
+            <div class="login-required">
+              <p class="login-required-text">
+                💬 댓글을 작성하려면 로그인이 필요합니다
+              </p>
+              <Button onclick={() => goto('/login')}>
+                로그인하기
+              </Button>
+            </div>
+          {:else}
+            {#if replyTo !== null}
+              <div class="reply-indicator">
+                답글 작성 중
+                <button onclick={cancelReply}>취소</button>
+              </div>
+            {/if}
+            
+            <textarea 
+              class="comment-input"
+              placeholder="댓글을 입력하세요..."
+              bind:value={commentContent}
+              rows="3"
+            ></textarea>
+            
+            <div class="comment-write-footer">
+              <Button onclick={handleCommentSubmit} disabled={submitting}>
+                {submitting ? '작성 중...' : '댓글 작성'}
+              </Button>
             </div>
           {/if}
-          
-          <textarea 
-            class="comment-input"
-            placeholder="댓글을 입력하세요..."
-            bind:value={commentContent}
-            rows="3"
-          ></textarea>
-          
-          <div class="comment-write-footer">
-            <Button onclick={handleCommentSubmit} disabled={submitting}>
-              {submitting ? '작성 중...' : '댓글 작성'}
-            </Button>
-          </div>
         </div>
         
         <!-- 댓글 목록 -->
@@ -477,6 +520,26 @@
     margin-bottom: 2rem;
     padding-bottom: 2rem;
     border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .login-required {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    background: linear-gradient(135deg, hsla(250 100% 70% / 0.1), hsla(280 100% 65% / 0.05));
+    border: 2px dashed hsl(var(--border));
+    border-radius: var(--radius-lg);
+    text-align: center;
+    gap: 1.5rem;
+  }
+
+  .login-required-text {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: hsl(var(--muted-foreground));
+    margin: 0;
   }
 
   .reply-indicator {

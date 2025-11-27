@@ -146,6 +146,12 @@
       }
       
       console.log('업로드 성공:', response);
+      
+      // 업로드 직후 status 체크
+      if (response.status === 'FAILED') {
+        throw new Error('파일 분석에 실패했습니다. 파일 형식이나 내용을 확인해주세요.');
+      }
+      
       storyId = response.storyId;
       currentStep = 2;
       
@@ -186,7 +192,9 @@
           characters = charactersData.characters;
           loadingAnalysis = false;
         } else if (progressData.status === 'FAILED') {
-          throw new Error(progressData.progress?.error || '분석 실패');
+          const errorMsg = progressData.progress?.error || '분석에 실패했습니다';
+          console.error('분석 실패 상세:', progressData);
+          throw new Error(`파일 분석 실패: ${errorMsg}\n\n파일 형식이나 내용을 확인해주세요.`);
         } else {
           // 3초 후 다시 체크
           setTimeout(() => checkProgress(), 3000);

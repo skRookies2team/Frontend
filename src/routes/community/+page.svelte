@@ -10,6 +10,7 @@
   let currentPage = $state(0);
   let totalPages = $state(0);
   let error = $state('');
+  let isLoggedIn = $state(false);
   
   // 글쓰기 모달
   let showWriteModal = $state(false);
@@ -36,6 +37,9 @@
   let contentEditableElement: HTMLDivElement;
 
   onMount(() => {
+    // 로그인 상태 확인
+    isLoggedIn = api.auth.isAuthenticated();
+    
     loadPosts();
   });
 
@@ -62,6 +66,13 @@
   }
 
   async function handleLike(postId: number) {
+    // 로그인 체크
+    if (!isLoggedIn) {
+      alert('로그인이 필요합니다.');
+      goto('/login');
+      return;
+    }
+    
     try {
       await api.post.toggleLike(postId);
       // Reload posts to update like count
@@ -72,6 +83,13 @@
   }
 
   async function handleBookmark(postId: number) {
+    // 로그인 체크
+    if (!isLoggedIn) {
+      alert('로그인이 필요합니다.');
+      goto('/login');
+      return;
+    }
+    
     try {
       await api.post.toggleBookmark(postId);
       // Reload posts to update bookmark status
@@ -98,10 +116,36 @@
     return `${diffDays}일 전`;
   }
   
+  // HTML 태그 제거 및 미디어 표시 함수
+  function getPreviewText(htmlContent: string): string {
+    let text = htmlContent;
+    
+    // 이미지 태그를 [이미지]로 대체
+    text = text.replace(/<img[^>]*>/gi, ' [이미지] ');
+    
+    // 동영상 태그를 [동영상]으로 대체
+    text = text.replace(/<video[^>]*>.*?<\/video>/gi, ' [동영상] ');
+    
+    // 나머지 모든 HTML 태그 제거
+    text = text.replace(/<[^>]+>/g, '');
+    
+    // HTML 엔티티 디코딩
+    text = text.replace(/&nbsp;/g, ' ');
+    text = text.replace(/&lt;/g, '<');
+    text = text.replace(/&gt;/g, '>');
+    text = text.replace(/&amp;/g, '&');
+    text = text.replace(/&quot;/g, '"');
+    
+    // 연속된 공백 제거
+    text = text.replace(/\s+/g, ' ').trim();
+    
+    return text;
+  }
+  
   function openWriteModal() {
     // 로그인 체크
-    if (!api.auth.isAuthenticated()) {
-      alert('로그인이 필요합니다.');
+    if (!isLoggedIn) {
+      alert('글 작성은 로그인이 필요합니다.');
       goto('/login');
       return;
     }
@@ -256,14 +300,50 @@
           // S3 URL 생성 (다운로드 URL 받기)
           const imageUrl = await api.upload.getDownloadUrl(fileKey);
           
-          // 에디터에 이미지 삽입
-          const img = `<img src="${imageUrl}" style="max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0;" alt="${file.name}" />`;
-          execCommand('insertHTML', img);
+          console.log(`이미지 URL: ${imageUrl}`);
           
-          console.log(`에디터에 이미지 삽입 완료`);
+          // 에디터에 이미지 삽입 (더 안전한 방법)
+          if (contentEditableElement) {
+            // 이미지 생성
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.alt = file.name;
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.borderRadius = '8px';
+            img.style.margin = '8px 0';
+            img.style.display = 'block';
+            
+            // 이미지 로드 완료 후 표시
+            img.onload = () => {
+              console.log('이미지 로드 완료');
+            };
+            
+            img.onerror = () => {
+              console.error('이미지 로드 실패:', imageUrl);
+              alert('이미지를 불러올 수 없습니다.');
+            };
+            
+            // 에디터에 직접 삽입
+            contentEditableElement.appendChild(img);
+            
+            // 줄바꿈 추가
+            const br = document.createElement('br');
+            contentEditableElement.appendChild(br);
+            
+            // 에디터 포커스 및 스크롤
+            contentEditableElement.focus();
+            img.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            console.log(`에디터에 이미지 삽입 완료`);
+          } else {
+            console.error('contentEditableElement가 없습니다');
+            alert('에디터가 준비되지 않았습니다. 페이지를 새로고침해주세요.');
+          }
         }
         
-        alert('이미지 업로드가 완료되었습니다!');
+        console.log(`총 ${files.length}개 이미지 업로드 완료`);
+        // alert 제거 - 사용자 경험 개선
       } catch (err) {
         console.error('이미지 업로드 실패:', err);
         alert('이미지 업로드에 실패했습니다.');
@@ -312,14 +392,48 @@
           // S3 URL 생성 (다운로드 URL 받기)
           const videoUrl = await api.upload.getDownloadUrl(fileKey);
           
-          // 에디터에 동영상 삽입
-          const video = `<video src="${videoUrl}" controls style="max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0;"></video>`;
-          execCommand('insertHTML', video);
+          console.log(`동영상 URL: ${videoUrl}`);
           
-          console.log(`에디터에 동영상 삽입 완료`);
+          // 에디터에 동영상 삽입 (더 안전한 방법)
+          if (contentEditableElement) {
+            const video = document.createElement('video');
+            video.src = videoUrl;
+            video.controls = true;
+            video.style.maxWidth = '100%';
+            video.style.height = 'auto';
+            video.style.borderRadius = '8px';
+            video.style.margin = '8px 0';
+            video.style.display = 'block';
+            
+            video.onloadedmetadata = () => {
+              console.log('동영상 로드 완료');
+            };
+            
+            video.onerror = () => {
+              console.error('동영상 로드 실패:', videoUrl);
+              alert('동영상을 불러올 수 없습니다.');
+            };
+            
+            // 에디터에 직접 삽입
+            contentEditableElement.appendChild(video);
+            
+            // 줄바꿈 추가
+            const br = document.createElement('br');
+            contentEditableElement.appendChild(br);
+            
+            // 에디터 포커스 및 스크롤
+            contentEditableElement.focus();
+            video.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            console.log(`에디터에 동영상 삽입 완료`);
+          } else {
+            console.error('contentEditableElement가 없습니다');
+            alert('에디터가 준비되지 않았습니다. 페이지를 새로고침해주세요.');
+          }
         }
         
-        alert('동영상 업로드가 완료되었습니다!');
+        console.log(`총 ${files.length}개 동영상 업로드 완료`);
+        // alert 제거 - 사용자 경험 개선
       } catch (err) {
         console.error('동영상 업로드 실패:', err);
         alert('동영상 업로드에 실패했습니다.');
@@ -440,7 +554,7 @@
               </div>
               
               <h2 class="post-title">{post.title}</h2>
-              <p class="post-content">{post.content.substring(0, 200)}{post.content.length > 200 ? '...' : ''}</p>
+              <p class="post-content">{getPreviewText(post.content).substring(0, 200)}{getPreviewText(post.content).length > 200 ? '...' : ''}</p>
               
               <div class="post-footer">
                 <button 
