@@ -26,7 +26,7 @@
           nickname
         });
         alert('회원가입이 완료되었습니다!');
-        goto('/');
+        goto('/', { invalidateAll: true });
       } else {
         // 로그인
         const response = await api.auth.login({
@@ -38,11 +38,9 @@
         console.log('저장된 토큰:', localStorage.getItem('accessToken'));
         
         alert('로그인 되었습니다!');
-        
-        // 약간의 딜레이 후 이동
-        setTimeout(() => {
-          goto('/');
-        }, 100);
+
+        // 페이지 이동 (모든 데이터 새로고침)
+        goto('/', { invalidateAll: true });
       }
     } catch (error) {
       if (error instanceof ApiError) {
