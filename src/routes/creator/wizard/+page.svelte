@@ -40,11 +40,15 @@
   let numEpisodeEndings = $state(3);
   let configuringStory = $state(false);
   
-  // 5-6단계: 스토리 생성 중
+  // 5-6단계: 스토리 생성 중 (에피소드별 생성)
   let generating = $state(false);
   let progress = $state(0);
   let progressMessage = $state('');
   let currentPhase = $state('');
+  let currentTaskId = $state('');  // 현재 생성 작업 ID
+  let currentEpisode = $state(1);  // 현재 생성 중인 에피소드
+  let totalEpisodesGenerated = $state(0);  // 생성 완료된 에피소드 수
+  let actualTotalEpisodes = $state(0);  // 백엔드에서 받은 실제 총 에피소드 수
   
   // 7단계: 완료
   let storyDataId = $state<number | null>(null);
@@ -287,7 +291,7 @@
     }
   }
   
-  // 4단계: 설정 제출 & 생성 시작
+  // 4단계: 설정 제출 & 생성 시작 (에피소드별 생성)
   async function submitConfig() {
     configuringStory = true;
     error = '';
@@ -302,15 +306,20 @@
         numEpisodeEndings
       });
       
-      // 생성 시작
-      const startResponse = await api.story.startGeneration(storyId);
-      console.log('생성 시작 응답:', startResponse);
+      // 에피소드 1 생성 시작
+      const startResponse = await api.story.startEpisodeGeneration(storyId);
+      console.log('EP1 생성 시작 응답:', startResponse);
       
+      currentTaskId = startResponse.taskId;
+      currentEpisode = 1;
+      totalEpisodesGenerated = 0;
+      // 백엔드에서 반환한 실제 총 에피소드 수 사용 (없으면 사용자 설정값 사용)
+      actualTotalEpisodes = startResponse.totalEpisodes || numEpisodes;
       currentStep = 5;
       generating = true;
       
-      // 진행률 폴링 시작 (개선된 버전)
-      pollProgressImproved();
+      // 에피소드별 진행률 폴링 시작
+      pollEpisodeProgress();
       
     } catch (err: any) {
       console.error('생성 실패:', err);
@@ -325,51 +334,88 @@
     }
   }
   
-  // 개선된 진행률 폴링 (에러를 무시하고 계속 시도)
-  async function pollProgressImproved() {
+  // 에피소드별 진행률 폴링 (taskId 기반)
+  async function pollEpisodeProgress() {
     generating = true;
     error = '';
     progress = 0;
-    progressMessage = '스토리 생성 중...';
+    progressMessage = `에피소드 ${currentEpisode}/${actualTotalEpisodes} 생성 중...`;
     
     let pollCount = 0;
-    const maxPolls = 300; // 최대 15분 (3초 * 300)
+    const maxPollsPerEpisode = 200; // 에피소드당 최대 10분 (3초 * 200)
     
     const poll = async (): Promise<void> => {
       try {
         pollCount++;
         
         if (pollCount % 10 === 0) {
-          console.log(`폴링 ${pollCount}회차 (${Math.floor(pollCount * 3 / 60)}분 경과)`);
+          console.log(`EP${currentEpisode} 폴링 ${pollCount}회차 (${Math.floor(pollCount * 3 / 60)}분 경과)`);
         }
         
-        // 진행률 조회 시도
+        // taskId로 진행률 조회
         try {
-          const progressData = await api.story.getProgress(storyId);
+          const progressData = await api.story.getGenerationProgress(currentTaskId);
           
           // 진행률 업데이트
           if (progressData.progress) {
-            progress = progressData.progress.percentage || progress;
-            progressMessage = progressData.progress.message || progressMessage;
+            // 전체 진행률 계산: (완료된 에피소드 + 현재 에피소드 진행률) / 총 에피소드
+            const episodeProgress = progressData.progress.percentage || 0;
+            progress = ((totalEpisodesGenerated * 100) + episodeProgress) / actualTotalEpisodes;
+            
+            progressMessage = progressData.progress.message || `에피소드 ${currentEpisode}/${actualTotalEpisodes} 생성 중...`;
             currentPhase = progressData.progress.currentPhase || currentPhase;
             
-            // 단계 자동 전환
+            // 단계 자동 전환 (50% 이상이면 디테일 추정 단계)
             if (progress >= 50 && currentStep === 5) {
               currentStep = 6;
             }
           }
           
-          // 상태 확인
+          // 현재 에피소드 완료 확인
           if (progressData.status === 'COMPLETED') {
-            console.log('✅ 생성 완료! 결과 로드 중...');
-            progress = 100;
-            await loadResultDirectly();
-            return;
+            totalEpisodesGenerated++;
+            console.log(`✅ EP${currentEpisode} 생성 완료! (${totalEpisodesGenerated}/${actualTotalEpisodes})`);
+            
+            // 모든 에피소드 완료 확인
+            if (totalEpisodesGenerated >= actualTotalEpisodes) {
+              console.log('🎉 모든 에피소드 생성 완료! 결과 로드 중...');
+              progress = 100;
+              await loadResultDirectly();
+              return;
+            }
+            
+            // 다음 에피소드 생성 시작
+            currentEpisode++;
+            pollCount = 0;
+            progressMessage = `에피소드 ${currentEpisode}/${actualTotalEpisodes} 생성 시작...`;
+            
+            try {
+              const nextResponse = await api.story.generateNextEpisode(storyId);
+              currentTaskId = nextResponse.taskId;
+              // 백엔드에서 총 에피소드 수 업데이트 (혹시 변경되었을 경우)
+              if (nextResponse.totalEpisodes) {
+                actualTotalEpisodes = nextResponse.totalEpisodes;
+              }
+              console.log(`EP${currentEpisode} 생성 시작, taskId:`, currentTaskId);
+              
+              // 다음 에피소드 폴링 계속
+              setTimeout(() => poll(), 2000);
+              return;
+            } catch (nextErr: any) {
+              console.error('다음 에피소드 생성 시작 실패:', nextErr);
+              error = `에피소드 ${currentEpisode} 생성 시작 실패: ${nextErr.message}`;
+              generating = false;
+              return;
+            }
           }
           
-          // FAILED 상태는 일단 무시하고 계속 시도
+          // FAILED 상태
           if (progressData.status === 'FAILED') {
-            console.warn('⚠️ FAILED 상태 감지, 계속 폴링 시도...');
+            const errorMsg = progressData.progress?.error || '알 수 없는 오류';
+            console.error(`❌ EP${currentEpisode} 생성 실패:`, errorMsg);
+            error = `에피소드 ${currentEpisode} 생성 실패: ${errorMsg}`;
+            generating = false;
+            return;
           }
           
         } catch (progressErr) {
@@ -380,9 +426,9 @@
         }
         
         // 타임아웃 체크
-        if (pollCount >= maxPolls) {
-          console.error('❌ 폴링 타임아웃');
-          error = '생성 시간이 너무 오래 걸립니다. 백엔드에서 생성이 완료되었는지 확인해주세요.';
+        if (pollCount >= maxPollsPerEpisode) {
+          console.error(`❌ EP${currentEpisode} 폴링 타임아웃`);
+          error = `에피소드 ${currentEpisode} 생성 시간 초과. 백엔드 상태를 확인해주세요.`;
           generating = false;
           return;
         }
@@ -633,6 +679,11 @@
     progress = 0;
     progressMessage = '';
     currentPhase = '';
+    // 에피소드별 생성 관련 초기화
+    currentTaskId = '';
+    currentEpisode = 1;
+    totalEpisodesGenerated = 0;
+    actualTotalEpisodes = 0;
   }
 </script>
 
@@ -969,33 +1020,60 @@
         </div>
 
       {:else if currentStep === 5}
-        <!-- 5단계: 스토리 트리 생성 -->
+        <!-- 5단계: 스토리 트리 생성 (에피소드별) -->
         <div class="content-card">
           <div class="card-header">
             <h2 class="card-title">🌳 5단계: 스토리 트리 자동 생성</h2>
-            <p class="card-desc">AI가 스토리의 구조와 분기를 생성하고 있습니다...</p>
+            <p class="card-desc">AI가 에피소드별로 스토리 구조를 생성하고 있습니다...</p>
           </div>
           <div class="card-body">
             <div class="generating-state">
               <div class="spinner"></div>
               <div class="progress-info">
+                <!-- 에피소드 진행 표시 -->
+                <div class="episode-progress">
+                  <span class="episode-label">에피소드 진행</span>
+                  <span class="episode-count">{currentEpisode} / {actualTotalEpisodes}</span>
+                </div>
+                
+                <!-- 전체 진행률 바 -->
                 <div class="progress-bar">
                   <div class="progress-fill" style="width: {progress}%"></div>
                 </div>
                 <p class="progress-text">{Math.round(progress)}% 완료</p>
+                
                 {#if progressMessage}
                   <p class="progress-message">{progressMessage}</p>
                 {/if}
                 {#if currentPhase}
                   <p class="progress-phase">현재 단계: {currentPhase}</p>
                 {/if}
+                
+                <!-- 에피소드 상태 표시 -->
+                <div class="episode-list">
+                  {#each Array(actualTotalEpisodes) as _, i}
+                    <div 
+                      class="episode-item"
+                      class:completed={i < totalEpisodesGenerated}
+                      class:active={i === totalEpisodesGenerated}
+                    >
+                      {#if i < totalEpisodesGenerated}
+                        ✓
+                      {:else if i === totalEpisodesGenerated}
+                        ⏳
+                      {:else}
+                        {i + 1}
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
       {:else if currentStep === 6}
-        <!-- 6단계: 디테일 추정 -->
+        <!-- 6단계: 디테일 추정 (에피소드별) -->
         <div class="content-card">
           <div class="card-header">
             <h2 class="card-title">✨ 6단계: 디테일 추정 중</h2>
@@ -1005,16 +1083,43 @@
             <div class="generating-state">
               <div class="spinner"></div>
               <div class="progress-info">
+                <!-- 에피소드 진행 표시 -->
+                <div class="episode-progress">
+                  <span class="episode-label">에피소드 진행</span>
+                  <span class="episode-count">{currentEpisode} / {actualTotalEpisodes}</span>
+                </div>
+                
+                <!-- 전체 진행률 바 -->
                 <div class="progress-bar">
                   <div class="progress-fill" style="width: {progress}%"></div>
                 </div>
                 <p class="progress-text">{Math.round(progress)}% 완료</p>
+                
                 {#if progressMessage}
                   <p class="progress-message">{progressMessage}</p>
                 {/if}
                 {#if currentPhase}
                   <p class="progress-phase">현재 단계: {currentPhase}</p>
                 {/if}
+                
+                <!-- 에피소드 상태 표시 -->
+                <div class="episode-list">
+                  {#each Array(actualTotalEpisodes) as _, i}
+                    <div 
+                      class="episode-item"
+                      class:completed={i < totalEpisodesGenerated}
+                      class:active={i === totalEpisodesGenerated}
+                    >
+                      {#if i < totalEpisodesGenerated}
+                        ✓
+                      {:else if i === totalEpisodesGenerated}
+                        ⏳
+                      {:else}
+                        {i + 1}
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
               </div>
             </div>
             {#if error}
@@ -1033,6 +1138,9 @@
                   <Button variant="outline" onclick={() => { 
                     console.log('=== 에러 상세 정보 ===');
                     console.log('storyId:', storyId);
+                    console.log('taskId:', currentTaskId);
+                    console.log('currentEpisode:', currentEpisode);
+                    console.log('totalEpisodesGenerated:', totalEpisodesGenerated);
                     console.log('error:', error);
                     console.log('progress:', progress);
                     console.log('currentPhase:', currentPhase);
@@ -2008,6 +2116,64 @@
   .progress-phase {
     font-weight: 600;
     color: hsl(var(--primary));
+  }
+
+  /* 에피소드 진행 표시 */
+  .episode-progress {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    background: hsl(var(--muted) / 0.3);
+    border-radius: var(--radius-md);
+  }
+
+  .episode-label {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .episode-count {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: hsl(var(--primary));
+  }
+
+  .episode-list {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .episode-item {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    border: 2px solid hsl(var(--border));
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all 0.3s;
+  }
+
+  .episode-item.completed {
+    background: hsl(142 76% 36%);
+    border-color: hsl(142 76% 36%);
+    color: white;
+  }
+
+  .episode-item.active {
+    background: hsl(var(--primary));
+    border-color: hsl(var(--primary));
+    color: white;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   .error-detail {

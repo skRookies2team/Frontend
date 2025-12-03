@@ -162,6 +162,19 @@ export interface StoryGenerationStartResponseDto {
   estimatedTime: string;
 }
 
+/**
+ * 에피소드별 생성 시작 응답
+ * taskId를 사용하여 진행률을 폴링합니다
+ */
+export interface TaskStartResponseDto {
+  storyId: string;
+  taskId: string;
+  status: StoryStatus;
+  message: string;
+  currentEpisode?: number;
+  totalEpisodes?: number;
+}
+
 export interface ProgressData {
   currentPhase: string;
   completedEpisodes: number;

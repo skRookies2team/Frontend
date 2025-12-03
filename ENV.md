@@ -8,12 +8,15 @@
 
 ```env
 # Backend API Configuration
+# 메인 백엔드 (인증, 스토리 관리, 커뮤니티 등) - 포트 8080
 PUBLIC_API_BASE_URL=http://localhost:8080
+# 릴레이 서버 (AI 분석, 생성, 이미지, 채팅) - 포트 8081
+PUBLIC_RELAY_API_URL=http://localhost:8081
 
 # API Mode: 'mock' or 'production'
 PUBLIC_API_MODE=production
 
-# LLM Configuration (for AI features)
+# LLM Configuration (for AI features - mock mode에서만 사용)
 PUBLIC_LLM_PROVIDER=openai
 PUBLIC_OPENAI_API_KEY=your_openai_api_key_here
 PUBLIC_OPENAI_MODEL=gpt-4-turbo-preview
@@ -23,7 +26,9 @@ PUBLIC_ANTHROPIC_API_KEY=your_anthropic_api_key_here
 PUBLIC_ANTHROPIC_MODEL=claude-3-sonnet-20240229
 
 # Image Generation Configuration
-PUBLIC_IMAGE_API_PROVIDER=openai
+# 'backend'로 설정하면 Relay 서버를 통해 이미지 생성
+# 'openai', 'stability', 'replicate'로 설정하면 직접 API 호출
+PUBLIC_IMAGE_API_PROVIDER=backend
 PUBLIC_IMAGE_API_KEY=your_image_api_key_here
 PUBLIC_IMAGE_MODEL=dall-e-3
 
@@ -35,8 +40,14 @@ PUBLIC_STORAGE_TYPE=localStorage
 
 ### Backend API
 
-- **PUBLIC_API_BASE_URL**: 백엔드 API 서버 주소
+- **PUBLIC_API_BASE_URL**: 메인 백엔드 API 서버 주소 (포트 8080)
+  - 담당 기능: 인증, 스토리 관리, 커뮤니티, 게임플레이 등
   - 개발 환경: `http://localhost:8080`
+  - 프로덕션: 실제 서버 주소
+
+- **PUBLIC_RELAY_API_URL**: 릴레이 서버 주소 (포트 8081)
+  - 담당 기능: AI 분석, 스토리 생성, 이미지 생성, 캐릭터 채팅 (RAG)
+  - 개발 환경: `http://localhost:8081`
   - 프로덕션: 실제 서버 주소
 
 - **PUBLIC_API_MODE**: API 작동 모드
@@ -64,11 +75,12 @@ PUBLIC_STORAGE_TYPE=localStorage
 ### Image Generation
 
 - **PUBLIC_IMAGE_API_PROVIDER**: 이미지 생성 제공자
-  - `openai`: OpenAI DALL-E 사용
-  - `stability`: Stability AI 사용
-  - `replicate`: Replicate API 사용
+  - `backend`: 릴레이 서버를 통해 이미지 생성 (권장)
+  - `openai`: OpenAI DALL-E 직접 호출
+  - `stability`: Stability AI 직접 호출
+  - `replicate`: Replicate API 직접 호출
 
-- **PUBLIC_IMAGE_API_KEY**: 이미지 생성 API 키
+- **PUBLIC_IMAGE_API_KEY**: 이미지 생성 API 키 (backend 모드에서는 불필요)
 
 - **PUBLIC_IMAGE_MODEL**: 사용할 이미지 생성 모델
   - OpenAI: `dall-e-3` 권장
@@ -97,7 +109,9 @@ PUBLIC_STORAGE_TYPE=localStorage
 
 ```env
 PUBLIC_API_BASE_URL=http://localhost:8080
+PUBLIC_RELAY_API_URL=http://localhost:8081
 PUBLIC_API_MODE=production
+PUBLIC_IMAGE_API_PROVIDER=backend
 PUBLIC_STORAGE_TYPE=api
 ```
 
@@ -107,8 +121,9 @@ PUBLIC_STORAGE_TYPE=api
 
 ```env
 PUBLIC_API_BASE_URL=https://api.yourdomain.com
+PUBLIC_RELAY_API_URL=https://relay.yourdomain.com
 PUBLIC_API_MODE=production
-PUBLIC_OPENAI_API_KEY=your_production_key
+PUBLIC_IMAGE_API_PROVIDER=backend
 PUBLIC_STORAGE_TYPE=api
 ```
 
@@ -162,8 +177,10 @@ PUBLIC_STORAGE_TYPE=api
 개발자 도구를 열고 콘솔에서 환경 변수 확인:
 
 ```javascript
-console.log(import.meta.env.PUBLIC_API_BASE_URL);
-console.log(import.meta.env.PUBLIC_API_MODE);
+console.log(import.meta.env.PUBLIC_API_BASE_URL);    // 메인 백엔드 URL
+console.log(import.meta.env.PUBLIC_RELAY_API_URL);   // 릴레이 서버 URL
+console.log(import.meta.env.PUBLIC_API_MODE);         // 'mock' 또는 'production'
+console.log(import.meta.env.PUBLIC_IMAGE_API_PROVIDER); // 'backend', 'openai' 등
 ```
 
 ## 추가 리소스

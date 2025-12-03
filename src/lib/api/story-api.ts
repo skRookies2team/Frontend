@@ -18,6 +18,7 @@ import type {
   StoryGenerationStartResponseDto,
   StoryProgressResponseDto,
   StoryResultResponseDto,
+  TaskStartResponseDto,
 } from './backend-types';
 
 export class StoryApi {
@@ -84,7 +85,8 @@ export class StoryApi {
   }
 
   /**
-   * 5단계: 스토리 생성 시작
+   * 5단계: 스토리 생성 시작 (EP1)
+   * @deprecated 에피소드별 생성 방식 사용 권장 (startEpisodeGeneration)
    */
   async startGeneration(storyId: string): Promise<StoryGenerationStartResponseDto> {
     return httpClient.post<StoryGenerationStartResponseDto>(
@@ -94,10 +96,41 @@ export class StoryApi {
   }
 
   /**
-   * 5-6단계: 생성 진행률 조회 (폴링용)
+   * 에피소드별 생성 시작 (EP1)
+   * taskId를 반환하며, 이를 사용하여 진행률을 폴링합니다
+   */
+  async startEpisodeGeneration(storyId: string): Promise<TaskStartResponseDto> {
+    return httpClient.post<TaskStartResponseDto>(
+      `/api/stories/${storyId}/generate`,
+      {}
+    );
+  }
+
+  /**
+   * 다음 에피소드 생성 시작
+   * 이전 에피소드 완료 후 호출합니다
+   */
+  async generateNextEpisode(storyId: string): Promise<TaskStartResponseDto> {
+    return httpClient.post<TaskStartResponseDto>(
+      `/api/stories/${storyId}/generate-next-episode`,
+      {}
+    );
+  }
+
+  /**
+   * 분석 진행률 조회 (storyId 기반)
+   * 소설 업로드 후 분석 단계에서 사용
    */
   async getProgress(storyId: string): Promise<StoryProgressResponseDto> {
     return httpClient.get<StoryProgressResponseDto>(`/api/stories/${storyId}/progress`);
+  }
+
+  /**
+   * 에피소드 생성 진행률 조회 (taskId 기반)
+   * 에피소드별 생성 시 사용
+   */
+  async getGenerationProgress(taskId: string): Promise<StoryProgressResponseDto> {
+    return httpClient.get<StoryProgressResponseDto>(`/api/stories/generate/progress/${taskId}`);
   }
 
   /**
@@ -105,6 +138,14 @@ export class StoryApi {
    */
   async getResult(storyId: string): Promise<StoryResultResponseDto> {
     return httpClient.get<StoryResultResponseDto>(`/api/stories/${storyId}/result`);
+  }
+
+  /**
+   * 전체 스토리 데이터 조회
+   * 게임 플레이용 전체 JSON 데이터
+   */
+  async getFullStoryData(storyId: string): Promise<any> {
+    return httpClient.get<any>(`/api/stories/${storyId}/data`);
   }
 }
 

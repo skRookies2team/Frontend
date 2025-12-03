@@ -5,12 +5,18 @@
 
 export type APIMode = 'mock' | 'production'
 export type LLMProvider = 'openai' | 'anthropic'
-export type ImageProvider = 'openai' | 'stability' | 'replicate'
+export type ImageProvider = 'openai' | 'stability' | 'replicate' | 'backend'
 export type StorageType = 'localStorage' | 'indexedDB' | 'api'
 
 export interface AppConfig {
   // API Mode
   apiMode: APIMode
+
+  // Backend URLs
+  backend: {
+    baseUrl: string  // 메인 백엔드 (인증, 스토리 관리 등)
+    relayUrl: string // 릴레이 서버 (AI 기능)
+  }
 
   // LLM Configuration
   llm: {
@@ -45,6 +51,11 @@ function loadConfig(): AppConfig {
   return {
     apiMode: (env.PUBLIC_API_MODE || 'mock') as APIMode,
     
+    backend: {
+      baseUrl: env.PUBLIC_API_BASE_URL || 'http://localhost:8080',
+      relayUrl: env.PUBLIC_RELAY_API_URL || 'http://localhost:8081',
+    },
+    
     llm: {
       provider: (env.PUBLIC_LLM_PROVIDER || 'openai') as LLMProvider,
       apiKey: env.PUBLIC_OPENAI_API_KEY || env.PUBLIC_ANTHROPIC_API_KEY || '',
@@ -52,7 +63,7 @@ function loadConfig(): AppConfig {
     },
     
     image: {
-      provider: (env.PUBLIC_IMAGE_API_PROVIDER || 'openai') as ImageProvider,
+      provider: (env.PUBLIC_IMAGE_API_PROVIDER || 'backend') as ImageProvider,
       apiKey: env.PUBLIC_IMAGE_API_KEY || '',
       model: env.PUBLIC_IMAGE_MODEL || 'dall-e-3',
     },

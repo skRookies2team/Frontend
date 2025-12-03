@@ -3,7 +3,12 @@
  * Handles all HTTP requests with authentication and error handling
  */
 
-const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL || 'http://localhost:8080';
+import { appConfig } from '$lib/config/app-config';
+
+// 메인 백엔드 URL (인증, 스토리 관리, 커뮤니티 등)
+const API_BASE_URL = appConfig.backend.baseUrl;
+// 릴레이 서버 URL (AI 기능: 분석, 생성, 이미지, 채팅)
+const RELAY_API_URL = appConfig.backend.relayUrl;
 
 export class ApiError extends Error {
   constructor(
@@ -209,6 +214,9 @@ class HttpClient {
   }
 }
 
-// Singleton instance
-export const httpClient = new HttpClient();
+// Singleton instances
+// 메인 백엔드 클라이언트 (인증, 스토리 관리, 커뮤니티 등)
+export const httpClient = new HttpClient(API_BASE_URL);
+// 릴레이 서버 클라이언트 (AI 기능: 분석, 생성, 이미지, 채팅)
+export const relayHttpClient = new HttpClient(RELAY_API_URL);
 
