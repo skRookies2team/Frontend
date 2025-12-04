@@ -11,37 +11,122 @@
   import GameMenu from '$lib/components/game-menu.svelte';
   import ProgressIndicator from '$lib/components/progress-indicator.svelte';
   import { Button } from '$lib/components/ui/button';
+  import { api, type StoryData } from '$lib/api';
   import type { Character, NovelConfig } from '$lib/types/game-state';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   
   const novelId = $derived($page.params.novel_id);
-  const novelConfig = $derived(novels.find(n => n.id === novelId));
+  let novelConfig = $state<NovelConfig | null>(null);
+  let storyData = $state<StoryData | null>(null);
+  let useApiGame = $state(false);
   
   let loading = $state(false);
   let selectedCharacter = $state<{ character: Character | null; response: string }>({ character: null, response: '' });
   let showMenu = $state(false);
   let gameInitialized = $state(false);
+  let sessionId = $state<string | null>(null);
   
   let gameState = $derived(gsm.currentState);
   
   onMount(async () => {
-    if (!novelConfig) {
-      window.location.href = '/';
-      return;
+    loading = true;
+    
+    // 먼저 하드코딩된 novels 배열에서 찾기
+    const localNovel = novels.find(n => n.id === novelId);
+    
+    if (localNovel) {
+      // 하드코딩된 소설이 있으면 기존 방식 사용
+      novelConfig = localNovel;
+      gsm.initializeGame(novelConfig);
+      
+      const firstScene = await storyGenerator.generateScene(
+        gsm.currentState,
+        novelConfig.description
+      );
+      gsm.setScene(firstScene);
+      
+      gameInitialized = true;
+    } else {
+      // 하드코딩된 소설이 없으면 API에서 가져오기
+      try {
+        const storyId = parseInt(novelId);
+        if (isNaN(storyId)) {
+          console.error('Invalid story ID:', novelId);
+          window.location.href = '/';
+          return;
+        }
+        
+        // 모든 스토리 목록에서 해당 ID 찾기
+        const allStories = await api.game.getAllStories();
+        const foundStory = allStories.find(s => s.id === storyId);
+        
+        if (!foundStory) {
+          console.error('Story not found:', storyId);
+          window.location.href = '/';
+          return;
+        }
+        
+        storyData = foundStory;
+        
+        // API 게임 시작
+        const gameStateResponse = await api.game.startGame({ storyDataId: storyId });
+        sessionId = gameStateResponse.sessionId;
+        
+        // 최소한의 NovelConfig 생성 (API 게임용)
+        novelConfig = {
+          id: novelId,
+          title: foundStory.title,
+          description: foundStory.description || '',
+          author: '사용자 생성',
+          category: '사용자 생성',
+          difficulty: '중급',
+          thumbnail: '',
+          characters: [],
+          themeGauges: gameStateResponse.gaugeDefinitions.map(g => ({
+            id: g.id,
+            name: g.name,
+            label: g.name,
+            leftLabel: g.leftLabel || '낮음',
+            rightLabel: g.rightLabel || '높음',
+            initialValue: gameStateResponse.gaugeStates[g.id] || 50,
+            description: g.description || ''
+          })),
+          initialState: {
+            act: 1,
+            scene: 1,
+            relationships: {},
+            trust: {},
+            themeGauges: gameStateResponse.gaugeStates,
+            flags: {}
+          }
+        };
+        
+        // 게임 상태 초기화
+        gsm.initializeGame(novelConfig);
+        
+        // API에서 받은 게임 상태를 씬으로 변환
+        const apiScene = {
+          id: gameStateResponse.currentNodeId,
+          text: gameStateResponse.nodeText,
+          choices: gameStateResponse.choices.map((c, idx) => ({
+            id: `choice-${idx}`,
+            text: c.text,
+            consequence: ''
+          }))
+        };
+        
+        gsm.setScene(apiScene);
+        useApiGame = true;
+        gameInitialized = true;
+      } catch (err) {
+        console.error('Failed to load story from API:', err);
+        alert('게임을 불러오는데 실패했습니다.');
+        window.location.href = '/';
+        return;
+      }
     }
     
-    // Initialize game
-    loading = true;
-    gsm.initializeGame(novelConfig);
-    
-    const firstScene = await storyGenerator.generateScene(
-      gsm.currentState,
-      novelConfig.description
-    );
-    gsm.setScene(firstScene);
-    
-    gameInitialized = true;
     loading = false;
   });
   
@@ -52,15 +137,56 @@
     const choice = gameState.currentScene.choices.find((c: any) => c.id === choiceId);
     
     if (choice) {
-      gsm.processChoice(choice);
-      saveGameState(gsm.currentState);
-      
-      const nextScene = await storyGenerator.generateScene(
-        gsm.currentState,
-        novelConfig.description,
-        choice
-      );
-      gsm.setScene(nextScene);
+      if (useApiGame && sessionId) {
+        // API 게임 사용 시
+        try {
+          const choiceIndex = parseInt(choiceId.replace('choice-', ''));
+          if (isNaN(choiceIndex)) {
+            console.error('Invalid choice index:', choiceId);
+            loading = false;
+            return;
+          }
+          
+          const gameStateResponse = await api.game.makeChoice(sessionId, choiceIndex);
+          
+          // 게이지 상태 업데이트
+          if (novelConfig && novelConfig.themeGauges) {
+            novelConfig.themeGauges.forEach(gauge => {
+              if (gameStateResponse.gaugeStates[gauge.id] !== undefined) {
+                gsm.currentState.themeGauges[gauge.id] = gameStateResponse.gaugeStates[gauge.id];
+              }
+            });
+          }
+          
+          // 다음 씬으로 이동
+          const nextScene = {
+            id: gameStateResponse.currentNodeId,
+            text: gameStateResponse.nodeText,
+            choices: gameStateResponse.choices.map((c, idx) => ({
+              id: `choice-${idx}`,
+              text: c.text,
+              consequence: ''
+            }))
+          };
+          
+          gsm.setScene(nextScene);
+          saveGameState(gsm.currentState);
+        } catch (err) {
+          console.error('Failed to make choice:', err);
+          alert('선택지 처리에 실패했습니다.');
+        }
+      } else {
+        // 기존 방식 (하드코딩된 소설)
+        gsm.processChoice(choice);
+        saveGameState(gsm.currentState);
+        
+        const nextScene = await storyGenerator.generateScene(
+          gsm.currentState,
+          novelConfig.description,
+          choice
+        );
+        gsm.setScene(nextScene);
+      }
     }
     
     loading = false;
@@ -126,7 +252,7 @@
           </button>
           
           <div class="header-info">
-            <h1 class="game-title">{novelConfig.title}</h1>
+            <h1 class="game-title">{novelConfig?.title || '게임'}</h1>
             <p class="game-progress">
               Chapter {gameState.act} · Scene {gameState.scene}
             </p>
@@ -166,40 +292,44 @@
           </div>
           
           <aside class="game-sidebar">
-            <div class="sidebar-section">
-              <h2 class="sidebar-title">주제 게이지</h2>
-              <div class="gauges-list">
-                {#each novelConfig.themeGauges as gauge}
-                  <GaugeDisplay 
-                    {gauge} 
-                    value={gameState.themeGauges[gauge.id] || 0} 
-                  />
-                {/each}
-              </div>
-            </div>
-            
-            <div class="sidebar-section">
-              <h2 class="sidebar-title">캐릭터</h2>
-              <p class="sidebar-hint">
-                캐릭터를 클릭하여 조언을 구하세요
-              </p>
-              <div class="characters-list">
-                {#each novelConfig.characters as character}
-                  <button 
-                    class="character-btn" 
-                    type="button" 
-                    onclick={() => handleCharacterClick(character)}
-                    aria-label={`${character.name} 클릭`}
-                  >
-                    <CharacterPanel 
-                      {character}
-                      trustLevel={gameState.trust[character.id] || 0}
-                      relationship={gameState.relationships[character.id] || 0}
+            {#if novelConfig && novelConfig.themeGauges && novelConfig.themeGauges.length > 0}
+              <div class="sidebar-section">
+                <h2 class="sidebar-title">주제 게이지</h2>
+                <div class="gauges-list">
+                  {#each novelConfig.themeGauges as gauge}
+                    <GaugeDisplay 
+                      {gauge} 
+                      value={gameState.themeGauges[gauge.id] || 0} 
                     />
-                  </button>
-                {/each}
+                  {/each}
+                </div>
               </div>
-            </div>
+            {/if}
+            
+            {#if novelConfig && novelConfig.characters && novelConfig.characters.length > 0}
+              <div class="sidebar-section">
+                <h2 class="sidebar-title">캐릭터</h2>
+                <p class="sidebar-hint">
+                  캐릭터를 클릭하여 조언을 구하세요
+                </p>
+                <div class="characters-list">
+                  {#each novelConfig.characters as character}
+                    <button 
+                      class="character-btn" 
+                      type="button" 
+                      onclick={() => handleCharacterClick(character)}
+                      aria-label={`${character.name} 클릭`}
+                    >
+                      <CharacterPanel 
+                        {character}
+                        trustLevel={gameState.trust[character.id] || 0}
+                        relationship={gameState.relationships[character.id] || 0}
+                      />
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            {/if}
           </aside>
         </div>
       </div>
