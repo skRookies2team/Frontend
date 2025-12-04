@@ -3,6 +3,9 @@
   import { api, ApiError, type CharacterDto, type GaugeDto, type StoryStatus } from '$lib/api';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
+  import StoryTree from '$lib/components/story-tree.svelte';
+  import NodeEditor from '$lib/components/node-editor.svelte';
+  import type { TreeNode } from '$lib/components/story-tree.svelte';
   
   // 단계 상태
   let currentStep = $state(1);
@@ -40,15 +43,19 @@
   let numEpisodeEndings = $state(3);
   let configuringStory = $state(false);
   
-  // 5-6단계: 스토리 생성 중 (에피소드별 생성)
+  // 5-6단계: 스토리 생성 중 (동기 방식)
   let generating = $state(false);
-  let progress = $state(0);
   let progressMessage = $state('');
-  let currentPhase = $state('');
-  let currentTaskId = $state('');  // 현재 생성 작업 ID
   let currentEpisode = $state(1);  // 현재 생성 중인 에피소드
   let totalEpisodesGenerated = $state(0);  // 생성 완료된 에피소드 수
-  let actualTotalEpisodes = $state(0);  // 백엔드에서 받은 실제 총 에피소드 수
+  let actualTotalEpisodes = $state(0);  // 설정된 총 에피소드 수
+  
+  // 5단계: 트리 편집 관련
+  let currentEpisodeTree = $state<TreeNode | null>(null);  // 현재 에피소드의 트리 데이터
+  let currentEpisodeTitle = $state('');  // 현재 에피소드 제목
+  let selectedNode = $state<TreeNode | null>(null);  // 선택된 노드
+  let regenerating = $state(false);  // 서브트리 재생성 중
+  let treeEditMode = $state(false);  // 트리 편집 모드 여부
   
   // 7단계: 완료
   let storyDataId = $state<number | null>(null);
@@ -68,8 +75,8 @@
     { number: 2, title: '등장인물', desc: '자동 추출' },
     { number: 3, title: '게이지', desc: '5개 → 2개 선택' },
     { number: 4, title: '엔딩', desc: '예상 엔딩 설계' },
-    { number: 5, title: '스토리 트리', desc: '자동 생성' },
-    { number: 6, title: '디테일 추정', desc: 'NPC/상황/관계' },
+    { number: 5, title: '트리 편집', desc: '노드 수정/검토' },
+    { number: 6, title: '에피소드 생성', desc: '순차 생성' },
     { number: 7, title: '완료', desc: '체크/등록' },
   ];
   
@@ -291,10 +298,16 @@
     }
   }
   
-  // 4단계: 설정 제출 & 생성 시작 (에피소드별 생성)
+  // 4단계: 설정 제출 & 생성 시작 (동기 방식)
   async function submitConfig() {
     configuringStory = true;
+    generating = true;
     error = '';
+    currentEpisode = 1;
+    totalEpisodesGenerated = 0;
+    actualTotalEpisodes = numEpisodes;
+    currentStep = 5;
+    progressMessage = '에피소드 1 생성 중... (약 1-2분 소요)';
     
     try {
       // 설정 저장
@@ -306,145 +319,49 @@
         numEpisodeEndings
       });
       
-      // 에피소드 1 생성 시작
-      const startResponse = await api.story.startEpisodeGeneration(storyId);
-      console.log('EP1 생성 시작 응답:', startResponse);
+      // 에피소드 1 생성 (동기 - 완료될 때까지 대기)
+      console.log('EP1 생성 시작 (동기 방식)...');
+      console.log('StoryId:', storyId);
       
-      currentTaskId = startResponse.taskId;
-      currentEpisode = 1;
-      totalEpisodesGenerated = 0;
-      // 백엔드에서 반환한 실제 총 에피소드 수 사용 (없으면 사용자 설정값 사용)
-      actualTotalEpisodes = startResponse.totalEpisodes || numEpisodes;
-      currentStep = 5;
-      generating = true;
+      const episodeData = await api.story.startEpisodeGeneration(storyId);
+      console.log('EP1 생성 완료:', episodeData);
+      console.log('EpisodeData 구조:', {
+        hasNodes: !!episodeData.nodes,
+        nodesLength: episodeData.nodes?.length || 0,
+        title: episodeData.title,
+        order: episodeData.order,
+        keys: Object.keys(episodeData)
+      });
       
-      // 에피소드별 진행률 폴링 시작
-      pollEpisodeProgress();
+      if (episodeData.nodes && episodeData.nodes.length > 0) {
+        console.log('첫 번째 노드:', episodeData.nodes[0]);
+      }
+      
+      // 트리 편집 모드로 진입
+      enterTreeEditMode(episodeData);
       
     } catch (err: any) {
       console.error('생성 실패:', err);
       if (err instanceof ApiError) {
-        error = err.data?.message || '스토리 생성에 실패했습니다.';
+        error = err.data?.message || err.message || '스토리 생성에 실패했습니다.';
+        console.error('API 에러 상세:', {
+          status: err.status,
+          data: err.data,
+          message: err.message
+        });
       } else {
-        error = '네트워크 오류가 발생했습니다.';
+        error = err.message || '네트워크 오류가 발생했습니다.';
+        console.error('일반 에러:', err);
       }
       generating = false;
+      // 에러 발생 시 Step 4에 머물도록 (사용자가 다시 시도할 수 있게)
+      currentStep = 4;
     } finally {
       configuringStory = false;
     }
   }
   
-  // 에피소드별 진행률 폴링 (taskId 기반)
-  async function pollEpisodeProgress() {
-    generating = true;
-    error = '';
-    progress = 0;
-    progressMessage = `에피소드 ${currentEpisode}/${actualTotalEpisodes} 생성 중...`;
-    
-    let pollCount = 0;
-    const maxPollsPerEpisode = 200; // 에피소드당 최대 10분 (3초 * 200)
-    
-    const poll = async (): Promise<void> => {
-      try {
-        pollCount++;
-        
-        if (pollCount % 10 === 0) {
-          console.log(`EP${currentEpisode} 폴링 ${pollCount}회차 (${Math.floor(pollCount * 3 / 60)}분 경과)`);
-        }
-        
-        // taskId로 진행률 조회
-        try {
-          const progressData = await api.story.getGenerationProgress(currentTaskId);
-          
-          // 진행률 업데이트
-          if (progressData.progress) {
-            // 전체 진행률 계산: (완료된 에피소드 + 현재 에피소드 진행률) / 총 에피소드
-            const episodeProgress = progressData.progress.percentage || 0;
-            progress = ((totalEpisodesGenerated * 100) + episodeProgress) / actualTotalEpisodes;
-            
-            progressMessage = progressData.progress.message || `에피소드 ${currentEpisode}/${actualTotalEpisodes} 생성 중...`;
-            currentPhase = progressData.progress.currentPhase || currentPhase;
-            
-            // 단계 자동 전환 (50% 이상이면 디테일 추정 단계)
-            if (progress >= 50 && currentStep === 5) {
-              currentStep = 6;
-            }
-          }
-          
-          // 현재 에피소드 완료 확인
-          if (progressData.status === 'COMPLETED') {
-            totalEpisodesGenerated++;
-            console.log(`✅ EP${currentEpisode} 생성 완료! (${totalEpisodesGenerated}/${actualTotalEpisodes})`);
-            
-            // 모든 에피소드 완료 확인
-            if (totalEpisodesGenerated >= actualTotalEpisodes) {
-              console.log('🎉 모든 에피소드 생성 완료! 결과 로드 중...');
-              progress = 100;
-              await loadResultDirectly();
-              return;
-            }
-            
-            // 다음 에피소드 생성 시작
-            currentEpisode++;
-            pollCount = 0;
-            progressMessage = `에피소드 ${currentEpisode}/${actualTotalEpisodes} 생성 시작...`;
-            
-            try {
-              const nextResponse = await api.story.generateNextEpisode(storyId);
-              currentTaskId = nextResponse.taskId;
-              // 백엔드에서 총 에피소드 수 업데이트 (혹시 변경되었을 경우)
-              if (nextResponse.totalEpisodes) {
-                actualTotalEpisodes = nextResponse.totalEpisodes;
-              }
-              console.log(`EP${currentEpisode} 생성 시작, taskId:`, currentTaskId);
-              
-              // 다음 에피소드 폴링 계속
-              setTimeout(() => poll(), 2000);
-              return;
-            } catch (nextErr: any) {
-              console.error('다음 에피소드 생성 시작 실패:', nextErr);
-              error = `에피소드 ${currentEpisode} 생성 시작 실패: ${nextErr.message}`;
-              generating = false;
-              return;
-            }
-          }
-          
-          // FAILED 상태
-          if (progressData.status === 'FAILED') {
-            const errorMsg = progressData.progress?.error || '알 수 없는 오류';
-            console.error(`❌ EP${currentEpisode} 생성 실패:`, errorMsg);
-            error = `에피소드 ${currentEpisode} 생성 실패: ${errorMsg}`;
-            generating = false;
-            return;
-          }
-          
-        } catch (progressErr) {
-          // 진행률 조회 에러는 로그만 찍고 무시
-          if (pollCount % 10 === 0) {
-            console.warn('진행률 조회 실패 (무시하고 계속):', progressErr);
-          }
-        }
-        
-        // 타임아웃 체크
-        if (pollCount >= maxPollsPerEpisode) {
-          console.error(`❌ EP${currentEpisode} 폴링 타임아웃`);
-          error = `에피소드 ${currentEpisode} 생성 시간 초과. 백엔드 상태를 확인해주세요.`;
-          generating = false;
-          return;
-        }
-        
-        // 3초 후 다시 시도
-        setTimeout(() => poll(), 3000);
-        
-      } catch (err: any) {
-        console.error('폴링 중 치명적 오류:', err);
-        error = `폴링 오류: ${err.message}`;
-        generating = false;
-      }
-    };
-    
-    await poll();
-  }
+  // NOTE: 폴링 함수 제거됨 - 동기 방식 API로 변경되어 더 이상 필요 없음
   
   // 결과 직접 조회 (재시도 로직 포함)
   async function loadResultDirectly() {
@@ -657,6 +574,256 @@
     }
   }
   
+  // === 트리 편집 관련 함수 ===
+  
+  // 노드 선택 핸들러
+  function handleNodeSelect(event: CustomEvent<{ node: TreeNode }>) {
+    selectedNode = event.detail.node;
+    console.log('노드 선택됨:', selectedNode?.id);
+  }
+  
+  // 노드 수정 적용 (서브트리 재생성) - 백엔드 동기 API 사용
+  async function handleApplyChanges(event: CustomEvent<{ 
+    nodeId: string; 
+    newText: string; 
+    newChoices: Array<{ text: string; tags: string[] }>;
+  }>) {
+    if (!selectedNode || !currentEpisodeTree) return;
+    
+    const { nodeId, newText, newChoices } = event.detail;
+    
+    regenerating = true;
+    error = '';
+    
+    try {
+      console.log('서브트리 재생성 요청:', { nodeId, newText });
+      
+      // 백엔드 API를 통한 서브트리 재생성 (동기 방식)
+      const response = await api.story.regenerateSubtree(
+        storyId,
+        currentEpisode,
+        nodeId,
+        {
+          nodeText: newText,
+          choices: newChoices.map(c => c.text),
+          situation: selectedNode.details?.situation || '',
+          npcEmotions: selectedNode.details?.npc_emotions || {},
+          tags: newChoices.flatMap(c => c.tags)
+        }
+      );
+      
+      console.log('서브트리 재생성 완료:', response.totalNodesRegenerated, '개 노드');
+      
+      // 트리 업데이트 (재생성된 노드들로 교체)
+      updateTreeWithRegeneratedNodes(nodeId, response.regeneratedNodes);
+      
+      selectedNode = null;
+      alert(`✅ 서브트리 재생성 완료! ${response.totalNodesRegenerated}개 노드가 업데이트되었습니다.`);
+      
+    } catch (err: any) {
+      console.error('서브트리 재생성 실패:', err);
+      if (err instanceof ApiError) {
+        error = err.data?.message || '서브트리 재생성에 실패했습니다.';
+      } else {
+        error = err.message || '서브트리 재생성에 실패했습니다.';
+      }
+      alert('❌ 서브트리 재생성 실패: ' + error);
+    } finally {
+      regenerating = false;
+    }
+  }
+  
+  // 트리에서 특정 노드를 재생성된 노드로 교체
+  function updateTreeWithRegeneratedNodes(parentNodeId: string, regeneratedNodes: any[]) {
+    if (!currentEpisodeTree || regeneratedNodes.length === 0) return;
+    
+    // 재귀적으로 트리를 순회하며 해당 노드를 찾아 교체
+    function findAndReplace(node: TreeNode): TreeNode {
+      if (node.id === parentNodeId) {
+        // 재생성된 첫 번째 노드로 교체 (부모 노드 포함)
+        const newNode = convertToTreeNode(regeneratedNodes[0]);
+        return newNode;
+      }
+      
+      if (node.children && node.children.length > 0) {
+        node.children = node.children.map(child => findAndReplace(child));
+      }
+      
+      return node;
+    }
+    
+    currentEpisodeTree = findAndReplace({ ...currentEpisodeTree });
+  }
+  
+  // API 응답을 TreeNode 형식으로 변환
+  function convertToTreeNode(apiNode: any): TreeNode {
+    if (!apiNode) {
+      console.warn('convertToTreeNode: apiNode is null or undefined');
+      return {
+        id: 'unknown',
+        text: 'Unknown node',
+        depth: 0,
+        choices: [],
+        children: []
+      };
+    }
+    
+    // 백엔드 StoryNodeDto 구조:
+    // - id, depth, text, details (situation, npc_emotions, relations_update)
+    // - choices (StoryChoiceDto[])
+    // - children (StoryNodeDto[])
+    // - parent_id
+    
+    const node: TreeNode = {
+      id: apiNode.id || apiNode.nodeId || String(Math.random()),
+      text: apiNode.text || 'No text',
+      depth: apiNode.depth ?? 0,
+      choices: [],
+      children: [],
+      details: {}
+    };
+    
+    // choices 변환 (StoryChoiceDto -> { text, tags }[])
+    if (apiNode.choices && Array.isArray(apiNode.choices)) {
+      node.choices = apiNode.choices.map((choice: any) => ({
+        text: choice.text || '',
+        tags: choice.tags || []
+      }));
+    }
+    
+    // details 변환
+    if (apiNode.details) {
+      node.details = {
+        situation: apiNode.details.situation,
+        npc_emotions: apiNode.details.npc_emotions || apiNode.details.npcEmotions || {},
+        relations_update: apiNode.details.relations_update || apiNode.details.relationsUpdate || {}
+      };
+    } else {
+      // details가 없으면 직접 필드에서 추출
+      node.details = {
+        situation: apiNode.situation,
+        npc_emotions: apiNode.npc_emotions || apiNode.npcEmotions || {},
+        relations_update: apiNode.relations_update || apiNode.relationsUpdate || {}
+      };
+    }
+    
+    // children 재귀 변환
+    if (apiNode.children && Array.isArray(apiNode.children) && apiNode.children.length > 0) {
+      node.children = apiNode.children.map((child: any) => convertToTreeNode(child));
+    }
+    
+    return node;
+  }
+  
+  // 다음 에피소드 생성 (동기 방식)
+  async function generateNextEpisodeFromTree() {
+    // 현재 에피소드 완료 처리
+    totalEpisodesGenerated = currentEpisode;
+    
+    // 모든 에피소드 완료 확인
+    if (totalEpisodesGenerated >= actualTotalEpisodes) {
+      console.log('🎉 모든 에피소드 생성 완료!');
+      await loadResultDirectly();
+      return;
+    }
+    
+    generating = true;
+    treeEditMode = false;
+    error = '';
+    currentEpisode++;
+    progressMessage = `에피소드 ${currentEpisode}/${actualTotalEpisodes} 생성 중... (약 1-2분 소요)`;
+    
+    try {
+      // 다음 에피소드 생성 (동기 - 완료될 때까지 대기)
+      console.log(`EP${currentEpisode} 생성 시작 (동기 방식)...`);
+      const episodeData = await api.story.generateNextEpisode(storyId);
+      console.log(`EP${currentEpisode} 생성 완료:`, episodeData);
+      
+      // 트리 편집 모드로 진입
+      enterTreeEditMode(episodeData);
+      
+    } catch (err: any) {
+      console.error('다음 에피소드 생성 실패:', err);
+      if (err instanceof ApiError) {
+        error = err.data?.message || '다음 에피소드 생성에 실패했습니다.';
+      } else {
+        error = err.message || '네트워크 오류가 발생했습니다.';
+      }
+      generating = false;
+    }
+  }
+  
+  // 에피소드 생성 완료 후 트리 편집 모드로 전환
+  function enterTreeEditMode(episodeData: any) {
+    console.log('트리 편집 모드 진입:', episodeData);
+    
+    // 에피소드 데이터에서 트리 추출
+    if (episodeData.nodes && episodeData.nodes.length > 0) {
+      // nodes 리스트의 첫 번째 노드를 루트로 사용
+      // 백엔드에서 반환하는 nodes는 평면 리스트일 수 있으므로,
+      // children 관계를 재구성해야 할 수도 있음
+      const rootNode = episodeData.nodes[0];
+      currentEpisodeTree = convertToTreeNode(rootNode);
+      
+      // 만약 nodes가 여러 개라면, children 관계를 재구성
+      if (episodeData.nodes.length > 1) {
+        // parent_id를 기준으로 트리 구조 재구성
+        const nodeMap = new Map<string, any>();
+        episodeData.nodes.forEach((node: any) => {
+          nodeMap.set(node.id || node.nodeId, node);
+        });
+        
+        // 루트 노드의 children 재구성
+        function buildTree(node: any): TreeNode {
+          const treeNode = convertToTreeNode(node);
+          if (node.children && Array.isArray(node.children)) {
+            treeNode.children = node.children.map((child: any) => buildTree(child));
+          } else {
+            // children이 없으면 parent_id로 찾기
+            const children = episodeData.nodes.filter((n: any) => 
+              (n.parent_id || n.parentId) === (node.id || node.nodeId)
+            );
+            if (children.length > 0) {
+              treeNode.children = children.map((child: any) => buildTree(child));
+            }
+          }
+          return treeNode;
+        }
+        
+        currentEpisodeTree = buildTree(rootNode);
+      }
+    } else if (episodeData.startNode) {
+      currentEpisodeTree = convertToTreeNode(episodeData.startNode);
+    } else {
+      console.warn('에피소드 데이터에 노드가 없습니다:', episodeData);
+      // 빈 트리로라도 편집 모드 진입
+      currentEpisodeTree = null;
+    }
+    
+    currentEpisodeTitle = episodeData.title || `에피소드 ${currentEpisode}`;
+    treeEditMode = true;
+    currentStep = 5;
+    generating = false;
+    selectedNode = null;
+    
+    console.log('트리 편집 모드 설정 완료:', {
+      title: currentEpisodeTitle,
+      hasTree: currentEpisodeTree !== null,
+      treeNodeCount: currentEpisodeTree ? countNodes(currentEpisodeTree) : 0
+    });
+  }
+  
+  // 트리 노드 개수 세기 (디버깅용)
+  function countNodes(node: TreeNode): number {
+    let count = 1;
+    if (node.children) {
+      node.children.forEach(child => {
+        count += countNodes(child);
+      });
+    }
+    return count;
+  }
+
   function createNew() {
     currentStep = 1;
     storyId = '';
@@ -676,14 +843,17 @@
     storyDataId = null;
     metadata = null;
     error = '';
-    progress = 0;
     progressMessage = '';
-    currentPhase = '';
     // 에피소드별 생성 관련 초기화
-    currentTaskId = '';
     currentEpisode = 1;
     totalEpisodesGenerated = 0;
     actualTotalEpisodes = 0;
+    // 트리 편집 관련 초기화
+    currentEpisodeTree = null;
+    currentEpisodeTitle = '';
+    selectedNode = null;
+    regenerating = false;
+    treeEditMode = false;
   }
 </script>
 
@@ -1020,64 +1190,165 @@
         </div>
 
       {:else if currentStep === 5}
-        <!-- 5단계: 스토리 트리 생성 (에피소드별) -->
-        <div class="content-card">
+        <!-- 5단계: 트리 편집 -->
+        <div class="content-card tree-edit-card">
           <div class="card-header">
-            <h2 class="card-title">🌳 5단계: 스토리 트리 자동 생성</h2>
-            <p class="card-desc">AI가 에피소드별로 스토리 구조를 생성하고 있습니다...</p>
+            <h2 class="card-title">🌳 5단계: 에피소드 트리 편집</h2>
+            <p class="card-desc">
+              {#if treeEditMode}
+                에피소드 {currentEpisode}의 스토리 트리를 검토하고 필요시 수정하세요
+              {:else}
+                AI가 에피소드 {currentEpisode}을(를) 생성하고 있습니다...
+              {/if}
+            </p>
           </div>
           <div class="card-body">
-            <div class="generating-state">
-              <div class="spinner"></div>
-              <div class="progress-info">
-                <!-- 에피소드 진행 표시 -->
-                <div class="episode-progress">
-                  <span class="episode-label">에피소드 진행</span>
-                  <span class="episode-count">{currentEpisode} / {actualTotalEpisodes}</span>
+            {#if treeEditMode}
+              <!-- 트리 편집 모드 -->
+              {#if currentEpisodeTree}
+              <div class="tree-edit-layout">
+                <!-- 트리 시각화 영역 -->
+                <div class="tree-panel">
+                  <div class="panel-header">
+                    <span class="panel-title">📊 스토리 트리</span>
+                    <span class="episode-badge">EP {currentEpisode} / {actualTotalEpisodes}</span>
+                  </div>
+                  <div class="tree-scroll-container">
+                    <StoryTree 
+                      rootNode={currentEpisodeTree}
+                      selectedNodeId={selectedNode?.id || ''}
+                      maxDepth={maxDepth}
+                      episodeTitle={currentEpisodeTitle}
+                      on:selectNode={handleNodeSelect}
+                    />
+                  </div>
                 </div>
                 
-                <!-- 전체 진행률 바 -->
-                <div class="progress-bar">
-                  <div class="progress-fill" style="width: {progress}%"></div>
-                </div>
-                <p class="progress-text">{Math.round(progress)}% 완료</p>
-                
-                {#if progressMessage}
-                  <p class="progress-message">{progressMessage}</p>
-                {/if}
-                {#if currentPhase}
-                  <p class="progress-phase">현재 단계: {currentPhase}</p>
-                {/if}
-                
-                <!-- 에피소드 상태 표시 -->
-                <div class="episode-list">
-                  {#each Array(actualTotalEpisodes) as _, i}
-                    <div 
-                      class="episode-item"
-                      class:completed={i < totalEpisodesGenerated}
-                      class:active={i === totalEpisodesGenerated}
-                    >
-                      {#if i < totalEpisodesGenerated}
-                        ✓
-                      {:else if i === totalEpisodesGenerated}
-                        ⏳
-                      {:else}
-                        {i + 1}
-                      {/if}
-                    </div>
-                  {/each}
+                <!-- 노드 편집 패널 -->
+                <div class="editor-panel-container">
+                  <NodeEditor 
+                    node={selectedNode}
+                    isLoading={regenerating}
+                    episodeTitle={currentEpisodeTitle}
+                    episodeOrder={currentEpisode}
+                    on:applyChanges={handleApplyChanges}
+                    on:cancel={() => { selectedNode = null; }}
+                  />
                 </div>
               </div>
-            </div>
+              
+              <!-- 하단 안내 -->
+              <div class="tree-edit-footer">
+                <div class="edit-instructions">
+                  <p>💡 <strong>사용법:</strong> 노드를 클릭하여 선택 → 내용 수정 → "적용" 버튼 클릭</p>
+                  <p>수정된 노드의 하위 트리가 자동으로 재생성됩니다.</p>
+                </div>
+                
+                <div class="edit-actions">
+                  <Button 
+                    variant="outline"
+                    onclick={() => { 
+                      // 현재 에피소드 스킵하고 다음으로
+                      if (confirm('현재 에피소드를 수정 없이 확정하시겠습니까?')) {
+                        generateNextEpisodeFromTree();
+                      }
+                    }}
+                    disabled={generating || regenerating}
+                  >
+                    {#if currentEpisode >= actualTotalEpisodes}
+                      ✅ 완료하기
+                    {:else}
+                      ⏭️ 다음 에피소드 생성
+                    {/if}
+                  </Button>
+                </div>
+              </div>
+              {:else}
+                <!-- 트리 데이터 없음 -->
+                <div class="empty-tree-state">
+                  <div class="empty-icon">⚠️</div>
+                  <h3 class="empty-title">트리 데이터를 불러올 수 없습니다</h3>
+                  <p class="empty-message">
+                    에피소드가 생성되었지만 트리 구조를 불러오지 못했습니다.
+                  </p>
+                  <div class="empty-actions">
+                    <Button 
+                      onclick={() => { 
+                        if (confirm('현재 에피소드를 건너뛰고 다음 에피소드를 생성하시겠습니까?')) {
+                          generateNextEpisodeFromTree();
+                        }
+                      }}
+                      disabled={generating || regenerating}
+                    >
+                      ⏭️ 다음 에피소드 생성
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onclick={() => {
+                        currentStep = 4;
+                        error = '';
+                      }}
+                    >
+                      ← 설정으로 돌아가기
+                    </Button>
+                  </div>
+                </div>
+              {/if}
+            {:else}
+              <!-- 생성 중 상태 (동기 방식) -->
+              <div class="generating-state">
+                <div class="spinner"></div>
+                <div class="progress-info">
+                  <!-- 에피소드 진행 표시 -->
+                  <div class="episode-progress">
+                    <span class="episode-label">에피소드 생성</span>
+                    <span class="episode-count">{currentEpisode} / {actualTotalEpisodes || numEpisodes}</span>
+                  </div>
+                  
+                  {#if progressMessage}
+                    <p class="progress-message">{progressMessage}</p>
+                  {/if}
+                  
+                  <p class="progress-hint">
+                    AI가 스토리를 생성하고 있습니다. 잠시만 기다려주세요...
+                  </p>
+                  
+                  <!-- 에피소드 상태 표시 -->
+                  <div class="episode-list">
+                    {#each Array(actualTotalEpisodes || numEpisodes) as _, i}
+                      <div 
+                        class="episode-item"
+                        class:completed={i < totalEpisodesGenerated}
+                        class:active={i === totalEpisodesGenerated && generating}
+                      >
+                        {#if i < totalEpisodesGenerated}
+                          ✓
+                        {:else if i === totalEpisodesGenerated && generating}
+                          ⏳
+                        {:else}
+                          {i + 1}
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              </div>
+            {/if}
+            
+            {#if error}
+              <div class="error-banner">
+                ❌ {error}
+              </div>
+            {/if}
           </div>
         </div>
 
       {:else if currentStep === 6}
-        <!-- 6단계: 디테일 추정 (에피소드별) -->
+        <!-- 6단계: 에피소드 생성 중 (동기 방식) -->
         <div class="content-card">
           <div class="card-header">
-            <h2 class="card-title">✨ 6단계: 디테일 추정 중</h2>
-            <p class="card-desc">NPC, 상황, 관계를 상세화하고 있습니다...</p>
+            <h2 class="card-title">✨ 6단계: 에피소드 생성 중</h2>
+            <p class="card-desc">AI가 스토리와 디테일을 생성하고 있습니다...</p>
           </div>
           <div class="card-body">
             <div class="generating-state">
@@ -1085,34 +1356,29 @@
               <div class="progress-info">
                 <!-- 에피소드 진행 표시 -->
                 <div class="episode-progress">
-                  <span class="episode-label">에피소드 진행</span>
-                  <span class="episode-count">{currentEpisode} / {actualTotalEpisodes}</span>
+                  <span class="episode-label">에피소드 생성</span>
+                  <span class="episode-count">{currentEpisode} / {actualTotalEpisodes || numEpisodes}</span>
                 </div>
-                
-                <!-- 전체 진행률 바 -->
-                <div class="progress-bar">
-                  <div class="progress-fill" style="width: {progress}%"></div>
-                </div>
-                <p class="progress-text">{Math.round(progress)}% 완료</p>
                 
                 {#if progressMessage}
                   <p class="progress-message">{progressMessage}</p>
                 {/if}
-                {#if currentPhase}
-                  <p class="progress-phase">현재 단계: {currentPhase}</p>
-                {/if}
+                
+                <p class="progress-hint">
+                  동기 방식으로 생성 중입니다. 약 1-2분 소요됩니다...
+                </p>
                 
                 <!-- 에피소드 상태 표시 -->
                 <div class="episode-list">
-                  {#each Array(actualTotalEpisodes) as _, i}
+                  {#each Array(actualTotalEpisodes || numEpisodes) as _, i}
                     <div 
                       class="episode-item"
                       class:completed={i < totalEpisodesGenerated}
-                      class:active={i === totalEpisodesGenerated}
+                      class:active={i === totalEpisodesGenerated && generating}
                     >
                       {#if i < totalEpisodesGenerated}
                         ✓
-                      {:else if i === totalEpisodesGenerated}
+                      {:else if i === totalEpisodesGenerated && generating}
                         ⏳
                       {:else}
                         {i + 1}
@@ -1138,12 +1404,9 @@
                   <Button variant="outline" onclick={() => { 
                     console.log('=== 에러 상세 정보 ===');
                     console.log('storyId:', storyId);
-                    console.log('taskId:', currentTaskId);
                     console.log('currentEpisode:', currentEpisode);
                     console.log('totalEpisodesGenerated:', totalEpisodesGenerated);
                     console.log('error:', error);
-                    console.log('progress:', progress);
-                    console.log('currentPhase:', currentPhase);
                     console.log('progressMessage:', progressMessage);
                     alert('콘솔(F12)에서 상세 정보를 확인하세요');
                   }}>
@@ -2106,16 +2369,109 @@
     font-weight: 700;
   }
 
-  .progress-message,
-  .progress-phase {
+  /* 트리 편집 레이아웃 */
+  .tree-edit-card {
+    min-height: 600px;
+  }
+
+  .tree-edit-layout {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 1.5rem;
+    min-height: 500px;
+  }
+
+  .tree-panel {
+    background: hsl(var(--muted) / 0.2);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: hsl(var(--muted) / 0.3);
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .panel-title {
+    font-weight: 600;
+    color: hsl(var(--foreground));
+  }
+
+  .episode-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    background: hsl(var(--primary));
+    color: white;
+    border-radius: var(--radius-full);
+    font-weight: 600;
+  }
+
+  .tree-scroll-container {
+    flex: 1;
+    overflow: auto;
+    padding: 1rem;
+  }
+
+  .editor-panel-container {
+    min-height: 400px;
+  }
+
+  .tree-edit-footer {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid hsl(var(--border));
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .edit-instructions {
+    flex: 1;
+  }
+
+  .edit-instructions p {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 0.25rem;
+  }
+
+  .edit-instructions strong {
+    color: hsl(var(--foreground));
+  }
+
+  .edit-actions {
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 900px) {
+    .tree-edit-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .editor-panel-container {
+      min-height: 300px;
+    }
+  }
+
+  .progress-message {
     font-size: 0.875rem;
     color: hsl(var(--muted-foreground));
     margin-top: 0.5rem;
   }
 
-  .progress-phase {
-    font-weight: 600;
+  .progress-hint {
+    font-size: 0.875rem;
     color: hsl(var(--primary));
+    margin-top: 1rem;
+    font-weight: 500;
   }
 
   /* 에피소드 진행 표시 */
@@ -2192,6 +2548,35 @@
     font-family: monospace;
     font-size: 0.875rem;
     line-height: 1.6;
+  }
+
+  /* 빈 트리 상태 */
+  .empty-tree-state {
+    text-align: center;
+    padding: 3rem;
+  }
+
+  .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .empty-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+    margin-bottom: 0.5rem;
+  }
+
+  .empty-message {
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 2rem;
+  }
+
+  .empty-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
   }
 
   @media (max-width: 768px) {

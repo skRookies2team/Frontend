@@ -18,7 +18,9 @@ import type {
   StoryGenerationStartResponseDto,
   StoryProgressResponseDto,
   StoryResultResponseDto,
-  TaskStartResponseDto,
+  EpisodeDto,
+  UpdateNodeRequestDto,
+  RegenerateSubtreeResponseDto,
 } from './backend-types';
 
 export class StoryApi {
@@ -85,35 +87,40 @@ export class StoryApi {
   }
 
   /**
-   * 5단계: 스토리 생성 시작 (EP1)
-   * @deprecated 에피소드별 생성 방식 사용 권장 (startEpisodeGeneration)
+   * 5단계: 첫 번째 에피소드(EP1) 생성 시작 - 동기 방식
+   * AI 서버에서 에피소드 생성이 완료될 때까지 대기 후 EpisodeDto 반환
    */
-  async startGeneration(storyId: string): Promise<StoryGenerationStartResponseDto> {
-    return httpClient.post<StoryGenerationStartResponseDto>(
+  async startEpisodeGeneration(storyId: string): Promise<EpisodeDto> {
+    return httpClient.post<EpisodeDto>(
       `/api/stories/${storyId}/generate`,
       {}
     );
   }
 
   /**
-   * 에피소드별 생성 시작 (EP1)
-   * taskId를 반환하며, 이를 사용하여 진행률을 폴링합니다
+   * 다음 에피소드 생성 - 동기 방식
+   * 이전 에피소드 완료 후 호출, 생성 완료 시 EpisodeDto 반환
    */
-  async startEpisodeGeneration(storyId: string): Promise<TaskStartResponseDto> {
-    return httpClient.post<TaskStartResponseDto>(
-      `/api/stories/${storyId}/generate`,
-      {}
-    );
-  }
-
-  /**
-   * 다음 에피소드 생성 시작
-   * 이전 에피소드 완료 후 호출합니다
-   */
-  async generateNextEpisode(storyId: string): Promise<TaskStartResponseDto> {
-    return httpClient.post<TaskStartResponseDto>(
+  async generateNextEpisode(storyId: string): Promise<EpisodeDto> {
+    return httpClient.post<EpisodeDto>(
       `/api/stories/${storyId}/generate-next-episode`,
       {}
+    );
+  }
+
+  /**
+   * 노드 수정 및 서브트리 재생성 - 동기 방식
+   * 특정 노드를 수정하고 하위 노드들을 AI가 재생성합니다
+   */
+  async regenerateSubtree(
+    storyId: string,
+    episodeOrder: number,
+    nodeId: string,
+    data: UpdateNodeRequestDto
+  ): Promise<RegenerateSubtreeResponseDto> {
+    return httpClient.put<RegenerateSubtreeResponseDto>(
+      `/api/stories/${storyId}/episodes/${episodeOrder}/nodes/${nodeId}/regenerate`,
+      data
     );
   }
 
@@ -123,14 +130,6 @@ export class StoryApi {
    */
   async getProgress(storyId: string): Promise<StoryProgressResponseDto> {
     return httpClient.get<StoryProgressResponseDto>(`/api/stories/${storyId}/progress`);
-  }
-
-  /**
-   * 에피소드 생성 진행률 조회 (taskId 기반)
-   * 에피소드별 생성 시 사용
-   */
-  async getGenerationProgress(taskId: string): Promise<StoryProgressResponseDto> {
-    return httpClient.get<StoryProgressResponseDto>(`/api/stories/generate/progress/${taskId}`);
   }
 
   /**

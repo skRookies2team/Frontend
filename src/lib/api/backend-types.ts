@@ -361,6 +361,67 @@ export interface EpisodeEndingDto {
   gauge_changes: Record<string, number>;
 }
 
+// ==================== Episode & Node DTOs (동기 생성 API용) ====================
+
+/**
+ * 스토리 노드 상세 정보
+ */
+export interface StoryNodeDetailDto {
+  situation: string;
+  npc_emotions: Record<string, string>;
+  relations_update: Record<string, string>;
+}
+
+/**
+ * 스토리 노드
+ */
+export interface StoryNodeDto {
+  id: string;
+  depth: number;
+  text: string;
+  details: StoryNodeDetailDto;
+  choices: StoryChoiceDto[];
+  parent_id?: string;
+  node_type?: string;
+  episode_id?: string;
+  children?: StoryNodeDto[];
+}
+
+/**
+ * 에피소드 DTO (동기 API 응답)
+ */
+export interface EpisodeDto {
+  id: string;
+  title: string;
+  order: number;
+  description?: string;
+  theme?: string;
+  intro_text?: string;
+  nodes: StoryNodeDto[];
+  endings?: EpisodeEndingDto[];
+}
+
+/**
+ * 노드 수정 요청 DTO
+ */
+export interface UpdateNodeRequestDto {
+  nodeText: string;
+  choices?: string[];
+  situation?: string;
+  npcEmotions?: Record<string, string>;
+  tags?: string[];
+}
+
+/**
+ * 서브트리 재생성 응답 DTO (백엔드)
+ */
+export interface RegenerateSubtreeResponseDto {
+  status: string;
+  message: string;
+  regeneratedNodes: StoryNodeDto[];
+  totalNodesRegenerated: number;
+}
+
 export interface FinalEndingDto {
   id: string;
   type: string;

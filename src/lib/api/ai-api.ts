@@ -82,41 +82,50 @@ export interface ImageGenerationResponse {
   revisedPrompt?: string;
 }
 
+/**
+ * 서브트리 재생성 요청 (Relay Server → Python AI)
+ */
 export interface SubtreeRegenerationRequest {
   episodeTitle: string;
   episodeOrder: number;
   parentNode: {
     nodeId: string;
     text: string;
-    situation: string;
-    npcEmotions: { [key: string]: string };
-    relationsUpdate: { [key: string]: string };
-    choices: Array<{
-      text: string;
-      tags: string[];
-    }>;
+    choices?: string[];
+    situation?: string;
+    npcEmotions?: { [key: string]: string };
+    tags?: string[];
+    depth: number;
   };
   currentDepth: number;
   maxDepth: number;
-  selectedGauges: Array<{
-    id: string;
-    name: string;
-    meaning: string;
-    description: string;
-    min_label: string;
-    max_label: string;
-  }>;
-  characters: Array<{
-    name: string;
-    aliases: string[];
-    description: string;
-    relationships: string[];
-  }>;
-  novelSummary: string;
+  novelContext: string;
+  previousChoices?: string[];
+  selectedGaugeIds?: string[];
+  // 캐싱된 분석 결과 (성능 최적화)
+  summary?: string;
+  charactersJson?: string;
+  gaugesJson?: string;
 }
 
+/**
+ * 서브트리 재생성 응답 (Python AI → Relay Server)
+ */
 export interface SubtreeRegenerationResponse {
-  regeneratedNodes: any[];
+  status: string;
+  message: string;
+  regeneratedNodes: Array<{
+    nodeId: string;
+    text: string;
+    choices: string[];
+    depth: number;
+    parentId?: string;
+    details?: {
+      situation?: string;
+      npcEmotions?: { [key: string]: string };
+      tags?: string[];
+    };
+  }>;
   totalNodesRegenerated: number;
 }
 
@@ -210,4 +219,11 @@ export class AiApi {
 }
 
 export const aiApi = new AiApi();
+
+
+
+
+
+
+
 

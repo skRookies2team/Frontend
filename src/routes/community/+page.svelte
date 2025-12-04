@@ -691,17 +691,21 @@
           <div class="editor-toolbar">
             <!-- 첫 번째 줄: 미디어 및 기능 버튼 -->
             <div class="toolbar-row">
-              <button type="button" class="toolbar-btn" onclick={insertImageFromEditor} title="사진" disabled={uploading}>
-                📷
+              <button type="button" class="toolbar-btn media-btn" onclick={insertImageFromEditor} title="사진" disabled={uploading}>
+                <span class="btn-icon">📷</span>
+                <span class="btn-label">사진</span>
               </button>
-              <button type="button" class="toolbar-btn" onclick={insertVideoFromEditor} title="동영상" disabled={uploading}>
-                🎥
+              <button type="button" class="toolbar-btn media-btn" onclick={insertVideoFromEditor} title="동영상" disabled={uploading}>
+                <span class="btn-icon">🎥</span>
+                <span class="btn-label">동영상</span>
               </button>
-              <button type="button" class="toolbar-btn" onclick={insertLink} title="링크">
-                🔗
+              <button type="button" class="toolbar-btn media-btn" onclick={insertLink} title="링크">
+                <span class="btn-icon">🔗</span>
+                <span class="btn-label">링크</span>
               </button>
-              <button type="button" class="toolbar-btn" onclick={insertHorizontalRule} title="구분선">
-                ➖
+              <button type="button" class="toolbar-btn media-btn" onclick={insertHorizontalRule} title="구분선">
+                <span class="btn-icon">➖</span>
+                <span class="btn-label">구분선</span>
               </button>
               
               <div class="toolbar-divider"></div>
@@ -1346,7 +1350,7 @@
     border: 1px solid hsl(var(--border-bright));
     border-radius: var(--radius-xl);
     width: 100%;
-    max-width: 900px;
+    max-width: 1800px;
     max-height: 90vh;
     box-shadow: 
       0 24px 64px hsla(0 0% 0% / 0.5),
@@ -1538,6 +1542,24 @@
   .toolbar-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  /* 미디어 버튼 (사진, 동영상, 링크, 구분선) 스타일 */
+  .toolbar-btn.media-btn {
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    min-width: auto;
+  }
+
+  .toolbar-btn.media-btn .btn-icon {
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .toolbar-btn.media-btn .btn-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
   }
 
   .toolbar-divider {
@@ -1765,6 +1787,18 @@
       height: 28px;
       font-size: 0.75rem;
       padding: 0.125rem 0.25rem;
+    }
+
+    .toolbar-btn.media-btn {
+      padding: 0.25rem 0.5rem;
+    }
+
+    .toolbar-btn.media-btn .btn-icon {
+      font-size: 0.875rem;
+    }
+
+    .toolbar-btn.media-btn .btn-label {
+      font-size: 0.7rem;
     }
 
     .toolbar-select {
