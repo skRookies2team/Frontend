@@ -9,6 +9,7 @@
   import StoryScene from '$lib/components/story-scene.svelte';
   import EpisodeEnding from '$lib/components/episode-ending.svelte';
   import FinalEnding from '$lib/components/final-ending.svelte';
+  import EpisodeIntro from '$lib/components/episode-intro.svelte';
   import CharacterDialog from '$lib/components/character-dialog.svelte';
   import GameMenu from '$lib/components/game-menu.svelte';
   import ProgressIndicator from '$lib/components/progress-indicator.svelte';
@@ -35,6 +36,12 @@
   let finalEnding = $state<FinalEndingDto | null>(null);
   let endingGaugeDefinitions = $state<GaugeDto[]>([]);
   let finalGaugeStates = $state<Record<string, number>>({});
+  
+  // 에피소드 도입부 상태
+  let showEpisodeIntro = $state(false);
+  let episodeIntroTitle = $state('');
+  let episodeIntroText = $state('');
+  let currentEpisodeId = $state<string | null>(null);
   
   let gameState = $derived(gsm.currentState);
   
@@ -114,6 +121,24 @@
         // 게임 상태 초기화
         gsm.initializeGame(novelConfig);
         
+        // 에피소드 도입부 확인
+        console.log('게임 시작 - 도입부 확인:', {
+          hasIntroText: !!gameStateResponse.introText,
+          introText: gameStateResponse.introText,
+          episodeTitle: gameStateResponse.episodeTitle,
+          currentEpisodeId: gameStateResponse.currentEpisodeId
+        });
+        
+        if (gameStateResponse.introText && gameStateResponse.introText.trim()) {
+          console.log('도입부 표시 설정');
+          showEpisodeIntro = true;
+          episodeIntroTitle = gameStateResponse.episodeTitle || '에피소드 시작';
+          episodeIntroText = gameStateResponse.introText;
+          currentEpisodeId = gameStateResponse.currentEpisodeId;
+        } else {
+          console.log('도입부 텍스트가 없어서 표시하지 않음');
+        }
+        
         // API에서 받은 게임 상태를 씬으로 변환
         const apiScene = {
           id: gameStateResponse.currentNodeId,
@@ -155,6 +180,15 @@
             episodeEnding = null; // 엔딩 화면 닫기
             try {
               const gameStateResponse = await api.game.getGameState(sessionId);
+              
+              // 다음 에피소드 도입부 확인
+              if (gameStateResponse.introText && gameStateResponse.introText.trim() && 
+                  gameStateResponse.currentEpisodeId !== currentEpisodeId) {
+                showEpisodeIntro = true;
+                episodeIntroTitle = gameStateResponse.episodeTitle || '에피소드 시작';
+                episodeIntroText = gameStateResponse.introText;
+                currentEpisodeId = gameStateResponse.currentEpisodeId;
+              }
               
               // 다음 에피소드의 첫 노드로 이동
               const nextScene = {
@@ -445,6 +479,15 @@
                   try {
                     const gameStateResponse = await api.game.getGameState(sessionId!);
                     
+                    // 다음 에피소드 도입부 확인
+                    if (gameStateResponse.introText && gameStateResponse.introText.trim() && 
+                        gameStateResponse.currentEpisodeId !== currentEpisodeId) {
+                      showEpisodeIntro = true;
+                      episodeIntroTitle = gameStateResponse.episodeTitle || '에피소드 시작';
+                      episodeIntroText = gameStateResponse.introText;
+                      currentEpisodeId = gameStateResponse.currentEpisodeId;
+                    }
+                    
                     const nextScene = {
                       id: gameStateResponse.currentNodeId,
                       story: gameStateResponse.nodeText,
@@ -478,6 +521,17 @@
               />
             {/if}
           </div>
+          
+          {#if showEpisodeIntro}
+            <EpisodeIntro 
+              episodeTitle={episodeIntroTitle}
+              introText={episodeIntroText}
+              onStart={() => {
+                console.log('도입부 시작 버튼 클릭');
+                showEpisodeIntro = false;
+              }}
+            />
+          {/if}
           
           <aside class="game-sidebar">
             {#if novelConfig && novelConfig.themeGauges && novelConfig.themeGauges.length > 0}
