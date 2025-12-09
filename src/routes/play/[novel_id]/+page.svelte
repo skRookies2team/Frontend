@@ -7,12 +7,15 @@
   import GaugeDisplay from '$lib/components/gauge-display.svelte';
   import CharacterPanel from '$lib/components/character-panel.svelte';
   import StoryScene from '$lib/components/story-scene.svelte';
+  import EpisodeEnding from '$lib/components/episode-ending.svelte';
+  import FinalEnding from '$lib/components/final-ending.svelte';
   import CharacterDialog from '$lib/components/character-dialog.svelte';
   import GameMenu from '$lib/components/game-menu.svelte';
   import ProgressIndicator from '$lib/components/progress-indicator.svelte';
   import { Button } from '$lib/components/ui/button';
   import { api, type StoryData } from '$lib/api';
   import type { Character, NovelConfig } from '$lib/types/game-state';
+  import type { EpisodeEndingDto, FinalEndingDto, GaugeDto, EndingResponseDto } from '$lib/api/types/backend-types';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   
@@ -26,6 +29,12 @@
   let showMenu = $state(false);
   let gameInitialized = $state(false);
   let sessionId = $state<string | null>(null);
+  
+  // 엔딩 상태
+  let episodeEnding = $state<EpisodeEndingDto | null>(null);
+  let finalEnding = $state<FinalEndingDto | null>(null);
+  let endingGaugeDefinitions = $state<GaugeDto[]>([]);
+  let finalGaugeStates = $state<Record<string, number>>({});
   
   let gameState = $derived(gsm.currentState);
   
@@ -108,7 +117,7 @@
         // API에서 받은 게임 상태를 씬으로 변환
         const apiScene = {
           id: gameStateResponse.currentNodeId,
-          text: gameStateResponse.nodeText,
+          story: gameStateResponse.nodeText,
           choices: gameStateResponse.choices.map((c, idx) => ({
             id: `choice-${idx}`,
             text: c.text,
@@ -140,6 +149,55 @@
       if (useApiGame && sessionId) {
         // API 게임 사용 시
         try {
+          // 특수 선택지 처리 (에피소드 계속하기, 재시작 등)
+          if (choiceId === 'continue') {
+            // 다음 에피소드로 계속하기
+            episodeEnding = null; // 엔딩 화면 닫기
+            try {
+              const gameStateResponse = await api.game.getGameState(sessionId);
+              
+              // 다음 에피소드의 첫 노드로 이동
+              const nextScene = {
+                id: gameStateResponse.currentNodeId,
+                story: gameStateResponse.nodeText,
+                choices: gameStateResponse.choices.map((c, idx) => ({
+                  id: `choice-${idx}`,
+                  text: c.text,
+                  consequence: ''
+                }))
+              };
+              
+              // 게이지 상태 업데이트
+              if (novelConfig && novelConfig.themeGauges) {
+                novelConfig.themeGauges.forEach(gauge => {
+                  if (gameStateResponse.gaugeStates[gauge.id] !== undefined) {
+                    gsm.currentState.themeGauges[gauge.id] = gameStateResponse.gaugeStates[gauge.id];
+                  }
+                });
+              }
+              
+              gsm.setScene(nextScene);
+              saveGameState(gsm.currentState);
+              loading = false;
+              return;
+            } catch (err) {
+              console.error('Failed to continue to next episode:', err);
+              alert('다음 에피소드로 이동하는데 실패했습니다.');
+              loading = false;
+              return;
+            }
+          }
+          
+          if (choiceId === 'restart') {
+            // 게임 재시작
+            if (confirm('정말로 처음부터 다시 시작하시겠습니까?')) {
+              clearGameState();
+              window.location.reload();
+            }
+            loading = false;
+            return;
+          }
+          
           const choiceIndex = parseInt(choiceId.replace('choice-', ''));
           if (isNaN(choiceIndex)) {
             console.error('Invalid choice index:', choiceId);
@@ -158,10 +216,93 @@
             });
           }
           
+          // 에피소드 종료 확인 및 엔딩 처리
+          if (gameStateResponse.isEpisodeEnd && !gameStateResponse.isGameEnd && sessionId) {
+            console.log('에피소드 종료 감지:', {
+              isEpisodeEnd: gameStateResponse.isEpisodeEnd,
+              isGameEnd: gameStateResponse.isGameEnd,
+              episodeEndingInResponse: gameStateResponse.episodeEnding
+            });
+            
+            // 먼저 makeChoice 응답에 episodeEnding이 있는지 확인
+            if (gameStateResponse.episodeEnding) {
+              console.log('makeChoice 응답에서 episodeEnding 발견:', gameStateResponse.episodeEnding);
+              episodeEnding = gameStateResponse.episodeEnding;
+              endingGaugeDefinitions = gameStateResponse.gaugeDefinitions || [];
+              saveGameState(gsm.currentState);
+              loading = false;
+              return;
+            }
+            
+            // 없으면 getEnding API 호출
+            try {
+              console.log('getEnding API 호출 중...');
+              const endingResponse = await api.game.getEnding(sessionId);
+              console.log('getEnding 응답:', endingResponse);
+              
+              // 엔딩 정보 저장 및 표시
+              if (endingResponse.episodeEnding) {
+                console.log('getEnding에서 episodeEnding 발견:', endingResponse.episodeEnding);
+                episodeEnding = endingResponse.episodeEnding;
+                endingGaugeDefinitions = endingResponse.gaugeDefinitions || gameStateResponse.gaugeDefinitions || [];
+                saveGameState(gsm.currentState);
+                loading = false;
+                return;
+              } else {
+                console.warn('getEnding 응답에 episodeEnding이 없음:', endingResponse);
+              }
+            } catch (err) {
+              console.error('Failed to get episode ending:', err);
+              // 엔딩 호출 실패 시에도 계속 진행
+            }
+          }
+          
+          // 게임 종료 확인
+          if (gameStateResponse.isGameEnd && sessionId) {
+            console.log('게임 종료 감지:', {
+              isGameEnd: gameStateResponse.isGameEnd,
+              finalEndingInResponse: gameStateResponse.finalEnding
+            });
+            
+            // 먼저 makeChoice 응답에 finalEnding이 있는지 확인
+            if (gameStateResponse.finalEnding) {
+              console.log('makeChoice 응답에서 finalEnding 발견:', gameStateResponse.finalEnding);
+              finalEnding = gameStateResponse.finalEnding;
+              endingGaugeDefinitions = gameStateResponse.gaugeDefinitions || [];
+              finalGaugeStates = gameStateResponse.gaugeStates || {};
+              saveGameState(gsm.currentState);
+              loading = false;
+              return;
+            }
+            
+            // 없으면 getEnding API 호출
+            try {
+              console.log('getEnding API 호출 중 (최종 엔딩)...');
+              const endingResponse = await api.game.getEnding(sessionId);
+              console.log('getEnding 응답 (최종 엔딩):', endingResponse);
+              
+              // 최종 엔딩 정보 저장 및 표시
+              if (endingResponse.finalEnding) {
+                console.log('getEnding에서 finalEnding 발견:', endingResponse.finalEnding);
+                finalEnding = endingResponse.finalEnding;
+                endingGaugeDefinitions = endingResponse.gaugeDefinitions || gameStateResponse.gaugeDefinitions || [];
+                finalGaugeStates = endingResponse.finalGaugeStates || gameStateResponse.gaugeStates || {};
+                saveGameState(gsm.currentState);
+                loading = false;
+                return;
+              } else {
+                console.warn('getEnding 응답에 finalEnding이 없음:', endingResponse);
+              }
+            } catch (err) {
+              console.error('Failed to get final ending:', err);
+              // 엔딩 호출 실패 시에도 계속 진행
+            }
+          }
+          
           // 다음 씬으로 이동
           const nextScene = {
             id: gameStateResponse.currentNodeId,
-            text: gameStateResponse.nodeText,
+            story: gameStateResponse.nodeText,
             choices: gameStateResponse.choices.map((c, idx) => ({
               id: `choice-${idx}`,
               text: c.text,
@@ -283,6 +424,53 @@
                 <div class="spinner"></div>
                 <p class="loading-text">장면을 생성하는 중...</p>
               </div>
+            {:else if finalEnding}
+              <FinalEnding 
+                ending={finalEnding}
+                gaugeDefinitions={endingGaugeDefinitions}
+                finalGaugeStates={finalGaugeStates}
+                onRestart={() => {
+                  if (confirm('정말로 처음부터 다시 시작하시겠습니까?')) {
+                    clearGameState();
+                    window.location.reload();
+                  }
+                }}
+              />
+            {:else if episodeEnding}
+              <EpisodeEnding 
+                ending={episodeEnding}
+                gaugeDefinitions={endingGaugeDefinitions}
+                onContinue={async () => {
+                  episodeEnding = null;
+                  try {
+                    const gameStateResponse = await api.game.getGameState(sessionId!);
+                    
+                    const nextScene = {
+                      id: gameStateResponse.currentNodeId,
+                      story: gameStateResponse.nodeText,
+                      choices: gameStateResponse.choices.map((c, idx) => ({
+                        id: `choice-${idx}`,
+                        text: c.text,
+                        consequence: ''
+                      }))
+                    };
+                    
+                    if (novelConfig && novelConfig.themeGauges) {
+                      novelConfig.themeGauges.forEach(gauge => {
+                        if (gameStateResponse.gaugeStates[gauge.id] !== undefined) {
+                          gsm.currentState.themeGauges[gauge.id] = gameStateResponse.gaugeStates[gauge.id];
+                        }
+                      });
+                    }
+                    
+                    gsm.setScene(nextScene);
+                    saveGameState(gsm.currentState);
+                  } catch (err) {
+                    console.error('Failed to continue to next episode:', err);
+                    alert('다음 에피소드로 이동하는데 실패했습니다.');
+                  }
+                }}
+              />
             {:else if gameState.currentScene}
               <StoryScene 
                 scene={gameState.currentScene}

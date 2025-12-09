@@ -9,7 +9,8 @@ import type {
   ChoiceRequestDto,
   StoryData,
   GenerateStoryRequestDto,
-  HealthCheckResponse
+  HealthCheckResponse,
+  EndingResponseDto
 } from './types/backend-types';
 
 export class GameApi {
@@ -67,6 +68,13 @@ export class GameApi {
    */
   async checkAiHealth(): Promise<HealthCheckResponse> {
     return httpClient.get<HealthCheckResponse>('/api/game/ai/health');
+  }
+
+  /**
+   * Get ending information (episode or final ending)
+   */
+  async getEnding(sessionId: string): Promise<EndingResponseDto> {
+    return httpClient.get<EndingResponseDto>(`/api/game/${sessionId}/ending`);
   }
 }
 

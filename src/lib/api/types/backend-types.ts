@@ -430,6 +430,19 @@ export interface FinalEndingDto {
   summary: string;
 }
 
+/**
+ * 엔딩 API 응답 DTO
+ */
+export interface EndingResponseDto {
+  sessionId: string;
+  isCompleted: boolean;
+  finalEnding?: FinalEndingDto;
+  finalGaugeStates: Record<string, number>;
+  gaugeDefinitions: GaugeDto[];
+  completedEpisodesCount: number;
+  episodeEnding?: EpisodeEndingDto;
+}
+
 // ==================== Pagination ====================
 
 export interface Pageable {
