@@ -79,7 +79,7 @@
     border-color: hsl(var(--primary));
     box-shadow: 
       0 8px 24px rgba(0, 0, 0, 0.3),
-      0 0 0 1px hsla(250 100% 70% / 0.2);
+      0 0 0 1px hsla(0 90% 48% / 0.2);
     transform: translateY(-4px) scale(1.02);
   }
   
@@ -92,7 +92,7 @@
     gap: 2rem;
     margin-top: 1rem;
     padding-top: 1rem;
-    border-top: 1px solid hsla(250 50% 50% / 0.2);
+    border-top: 1px solid hsla(0 70% 45% / 0.2);
   }
   
   .stat {

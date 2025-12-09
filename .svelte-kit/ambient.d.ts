@@ -41,13 +41,7 @@ declare module '$env/static/private' {
 	export const CURSOR_TRACE_ID: string;
 	export const DriverData: string;
 	export const EDITOR: string;
-	export const EFC_26524_1262719628: string;
-	export const EFC_26524_1592913036: string;
-	export const EFC_26524_2283032206: string;
-	export const EFC_26524_2775293581: string;
-	export const EFC_26524_3789132940: string;
-	export const FPS_BROWSER_APP_PROFILE_STRING: string;
-	export const FPS_BROWSER_USER_PROFILE_STRING: string;
+	export const EFC_8100_1592913036: string;
 	export const GIT_ASKPASS: string;
 	export const HOME: string;
 	export const HOMEDRIVE: string;
@@ -84,6 +78,7 @@ declare module '$env/static/private' {
 	export const NPM_PREFIX_NPM_CLI_JS: string;
 	export const NUMBER_OF_PROCESSORS: string;
 	export const OneDrive: string;
+	export const OneDriveConsumer: string;
 	export const ORIGINAL_XDG_CURRENT_DESKTOP: string;
 	export const OS: string;
 	export const Path: string;
@@ -160,13 +155,7 @@ declare module '$env/dynamic/private' {
 		CURSOR_TRACE_ID: string;
 		DriverData: string;
 		EDITOR: string;
-		EFC_26524_1262719628: string;
-		EFC_26524_1592913036: string;
-		EFC_26524_2283032206: string;
-		EFC_26524_2775293581: string;
-		EFC_26524_3789132940: string;
-		FPS_BROWSER_APP_PROFILE_STRING: string;
-		FPS_BROWSER_USER_PROFILE_STRING: string;
+		EFC_8100_1592913036: string;
 		GIT_ASKPASS: string;
 		HOME: string;
 		HOMEDRIVE: string;
@@ -203,6 +192,7 @@ declare module '$env/dynamic/private' {
 		NPM_PREFIX_NPM_CLI_JS: string;
 		NUMBER_OF_PROCESSORS: string;
 		OneDrive: string;
+		OneDriveConsumer: string;
 		ORIGINAL_XDG_CURRENT_DESKTOP: string;
 		OS: string;
 		Path: string;

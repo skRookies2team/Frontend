@@ -100,7 +100,7 @@
     position: absolute;
     inset: 0;
     border-radius: var(--radius-xl);
-    background: linear-gradient(135deg, hsla(250 100% 70% / 0.08), transparent);
+    background: linear-gradient(135deg, hsla(0 90% 48% / 0.08), transparent);
     pointer-events: none;
     z-index: 1;
   }
@@ -187,7 +187,7 @@
     padding: 1.25rem 1.5rem;
     background: linear-gradient(
       90deg,
-      hsla(250 100% 70% / 0.15),
+      hsla(0 90% 48% / 0.15),
       hsla(240 12% 12% / 0.9)
     );
     border-left: 4px solid hsl(var(--primary));

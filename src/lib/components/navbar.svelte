@@ -99,7 +99,7 @@
     background: hsla(240 15% 6% / 0.8);
     backdrop-filter: blur(16px) saturate(180%);
     -webkit-backdrop-filter: blur(16px) saturate(180%);
-    border-bottom: 1px solid hsla(250 50% 50% / 0.2);
+    border-bottom: 1px solid hsla(0 70% 45% / 0.2);
     box-shadow: 
       0 4px 24px hsla(0 0% 0% / 0.2),
       inset 0 1px 0 hsla(255 255 255 / 0.05);
@@ -108,9 +108,9 @@
   }
 
   .nav-wrapper {
-    max-width: 1440px;
+    width: 100%;
     margin: 0 auto;
-    padding: 0 2rem;
+    padding: 0 4%;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -126,7 +126,7 @@
   .brand {
     font-size: 1.625rem;
     font-weight: 900;
-    background: linear-gradient(135deg, hsl(250 100% 70%), hsl(280 100% 65%), hsl(45 100% 65%));
+    background: linear-gradient(135deg, hsl(0 90% 48%), hsl(0 85% 42%), hsl(0 80% 50%));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -134,11 +134,11 @@
     letter-spacing: -0.02em;
     position: relative;
     transition: all 0.3s ease;
-    filter: drop-shadow(0 0 8px hsla(250 100% 70% / 0.3));
+    filter: drop-shadow(0 0 8px hsla(0 90% 48% / 0.3));
   }
   
   .brand:hover {
-    filter: drop-shadow(0 0 16px hsla(250 100% 70% / 0.5));
+    filter: drop-shadow(0 0 16px hsla(0 90% 48% / 0.5));
     transform: scale(1.05);
   }
 
@@ -172,7 +172,7 @@
 
   .nav-link:hover {
     color: hsl(0 0% 100%);
-    text-shadow: 0 0 8px hsla(250 100% 70% / 0.3);
+    text-shadow: 0 0 8px hsla(0 90% 48% / 0.3);
   }
   
   .nav-link:hover::after {
@@ -186,7 +186,7 @@
 
   .nav-link.active::after {
     width: 100%;
-    box-shadow: 0 0 8px hsla(250 100% 70% / 0.5);
+    box-shadow: 0 0 8px hsla(0 90% 48% / 0.5);
   }
 
   .nav-right {
@@ -204,8 +204,8 @@
   .search-input {
     width: 320px;
     padding: 0.75rem 2.75rem 0.75rem 1.25rem;
-    background: hsla(240 15% 15% / 0.6);
-    border: 1px solid hsla(250 50% 50% / 0.3);
+    background: hsla(0 15% 15% / 0.6);
+    border: 1px solid hsla(0 70% 45% / 0.3);
     border-radius: var(--radius-full);
     font-size: 0.9rem;
     color: hsl(0 0% 100%);
@@ -220,9 +220,9 @@
   .search-input:focus {
     outline: none;
     border-color: hsl(var(--primary));
-    background: hsla(240 15% 18% / 0.8);
+    background: hsla(0 15% 18% / 0.8);
     box-shadow: 
-      0 0 0 3px hsla(250 100% 70% / 0.1),
+      0 0 0 3px hsla(0 90% 48% / 0.1),
       0 4px 12px hsla(0 0% 0% / 0.2);
     transform: translateY(-1px);
   }
@@ -264,24 +264,24 @@
     display: flex;
     align-items: center;
     padding: 0.625rem 1.25rem;
-    background: linear-gradient(135deg, hsla(250 100% 70% / 0.15), hsla(280 100% 65% / 0.15));
-    border: 1px solid hsla(250 50% 50% / 0.3);
+    background: linear-gradient(135deg, hsla(0 90% 48% / 0.15), hsla(0 85% 42% / 0.15));
+    border: 1px solid hsla(0 70% 45% / 0.3);
     border-radius: var(--radius-full);
     backdrop-filter: blur(8px);
     transition: all 0.3s ease;
   }
   
   .user-info:hover {
-    background: linear-gradient(135deg, hsla(250 100% 70% / 0.25), hsla(280 100% 65% / 0.25));
-    border-color: hsla(250 50% 50% / 0.5);
-    box-shadow: 0 4px 12px hsla(250 100% 70% / 0.2);
+    background: linear-gradient(135deg, hsla(0 90% 48% / 0.25), hsla(0 85% 42% / 0.25));
+    border-color: hsla(0 70% 45% / 0.5);
+    box-shadow: 0 4px 12px hsla(0 90% 48% / 0.2);
   }
 
   .username {
     font-weight: 700;
     font-size: 0.875rem;
     color: hsl(0 0% 100%);
-    text-shadow: 0 0 8px hsla(250 100% 70% / 0.3);
+    text-shadow: 0 0 8px hsla(0 90% 48% / 0.3);
   }
 
   @media (max-width: 768px) {

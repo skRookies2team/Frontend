@@ -3,9 +3,14 @@
   import { api, ApiError, type CharacterDto, type GaugeDto, type StoryStatus } from '$lib/api';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import StoryTree from '$lib/components/story-tree.svelte';
-  import NodeEditor from '$lib/components/node-editor.svelte';
   import type { TreeNode } from '$lib/components/story-tree.svelte';
+  import Step1Upload from './steps/Step1Upload.svelte';
+  import Step2Characters from './steps/Step2Characters.svelte';
+  import Step3Gauges from './steps/Step3Gauges.svelte';
+  import Step4Ending from './steps/Step4Ending.svelte';
+  import Step5Tree from './steps/Step5Tree.svelte';
+  import Step6Generating from './steps/Step6Generating.svelte';
+  import Step7Complete from './steps/Step7Complete.svelte';
   
   // 단계 상태
   let currentStep = $state(1);
@@ -21,6 +26,7 @@
   // 2단계: 등장인물 & 요약 (자동 추출)
   let summary = $state('');
   let characters = $state<CharacterDto[]>([]);
+  let expandedCharacters = $state<Set<string>>(new Set());
   let loadingAnalysis = $state(false);
   
   // 3단계: 게이지 선택 (5개 → 2개 선택)
@@ -83,9 +89,8 @@
   function canGoNext(): boolean {
     switch (currentStep) {
       case 1: 
-        // 파일이 있거나 텍스트가 100자 이상 입력되어야 함
-        const hasValidInput = uploadedFile !== null || novelText.length >= 100;
-        return hasValidInput && title.length > 0;
+        // 파일이 있어야 함
+        return uploadedFile !== null && title.length > 0;
       case 2: return characters.length > 0 && summary.length > 0;
       case 3: return selectedGaugeIds.length === 2;
       case 4: return true;
@@ -95,6 +100,18 @@
     }
   }
   
+  function setTitleValue(value: string) {
+    title = value;
+  }
+
+  function setDescriptionValue(value: string) {
+    description = value;
+  }
+
+  function clearUploadedFile() {
+    uploadedFile = null;
+  }
+
   function toggleGauge(gaugeId: string) {
     if (selectedGaugeIds.includes(gaugeId)) {
       selectedGaugeIds = selectedGaugeIds.filter(id => id !== gaugeId);
@@ -104,6 +121,37 @@
       // 이미 2개 선택됨: 첫 번째를 제거하고 새로운 것 추가
       selectedGaugeIds = [selectedGaugeIds[1], gaugeId];
     }
+  }
+
+  function toggleCharacter(name: string) {
+    const next = new Set(expandedCharacters);
+    if (next.has(name)) {
+      next.delete(name);
+    } else {
+      next.add(name);
+    }
+    expandedCharacters = next;
+  }
+
+  function truncate(text: string, maxLength = 140) {
+    if (!text) return '';
+    return text.length > maxLength ? text.slice(0, maxLength) + '…' : text;
+  }
+
+  function handleEndingChange(key: string, value: number) {
+    endingConfig = { ...endingConfig, [key]: value };
+  }
+
+  function handleNumEpisodesChange(value: number) {
+    numEpisodes = value;
+  }
+
+  function handleMaxDepthChange(value: number) {
+    maxDepth = value;
+  }
+
+  function handleNumEpisodeEndingsChange(value: number) {
+    numEpisodeEndings = value;
   }
   
   // 1단계: 소설 업로드
@@ -115,7 +163,7 @@
     console.log('novelText length:', novelText.length);
     
     if (!canGoNext()) {
-      alert('제목과 소설 파일 또는 텍스트를 입력해주세요');
+      alert('제목과 소설 파일을 입력해주세요');
       return;
     }
     
@@ -144,16 +192,8 @@
           description,
           fileKey
         });
-      } 
-      // 텍스트가 있는 경우: 기존 방식 사용
-      else if (novelText) {
-        console.log('텍스트 직접 전송 방식 사용...');
-        response = await api.story.uploadNovel({
-          title,
-          novelText
-        });
       } else {
-        throw new Error('파일 또는 텍스트를 입력해주세요');
+        throw new Error('파일을 선택해주세요');
       }
       
       console.log('업로드 성공:', response);
@@ -861,7 +901,7 @@
   <div class="wizard-container">
     <!-- 헤더 -->
     <div class="wizard-header">
-      <h1 class="wizard-title">🧙‍♂️ 인터랙티브 스토리 마법사</h1>
+      <h1 class="wizard-title">인터랙티브 스토리 생성</h1>
       <p class="wizard-subtitle">
         소설을 입력하면 AI가 자동으로 인터랙티브 게임으로 변환합니다
       </p>
@@ -885,12 +925,28 @@
                 {/if}
               </div>
               <div class="step-info">
-                <div class="step-title">{step.title}</div>
-                <div class="step-desc">{step.desc}</div>
+                <div 
+                  class="step-title" 
+                  class:active-title={currentStep === step.number}
+                  class:completed-title={currentStep > step.number}
+                >
+                  {step.title}
+                </div>
+                <div 
+                  class="step-desc" 
+                  class:active-desc={currentStep === step.number}
+                  class:completed-desc={currentStep > step.number}
+                >
+                  {step.desc}
+                </div>
               </div>
             </div>
             {#if index < steps.length - 1}
-              <div class="step-connector" class:completed={currentStep > step.number}></div>
+              <div 
+                class="step-connector" 
+                class:completed={currentStep > step.number}
+                class:active={currentStep === step.number || currentStep === step.number + 1}
+              ></div>
             {/if}
           </div>
         {/each}
@@ -900,571 +956,116 @@
     <!-- 현재 단계 콘텐츠 -->
     <div class="step-content">
       {#if currentStep === 1}
-        <!-- 1단계: 소설 텍스트 입력 -->
-        <div class="content-card">
-          <div class="card-header">
-            <h2 class="card-title">📝 1단계: 소설 텍스트 입력</h2>
-            <p class="card-desc">인터랙티브 게임으로 만들 소설의 전문을 입력하세요</p>
-          </div>
-          <div class="card-body">
-            <div class="form-group">
-              <label class="form-label">소설 제목 *</label>
-              <input
-                type="text"
-                class="form-input"
-                bind:value={title}
-                placeholder="예: 파리대왕"
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">설명 (선택)</label>
-              <input
-                type="text"
-                class="form-input"
-                bind:value={description}
-                placeholder="소설에 대한 간단한 설명"
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">파일 업로드 (권장)</label>
-              <p class="field-hint">
-                지원 형식: .txt, .pdf, .doc, .docx (최대 10MB)
-              </p>
-              <input
-                type="file"
-                accept=".txt,.pdf,.doc,.docx"
-                class="file-input"
-                onchange={handleFileUpload}
-                disabled={uploading}
-              />
-              {#if uploadedFile}
-                <div class="file-info">
-                  <span class="file-icon">📄</span>
-                  <span class="file-name">{uploadedFile.name}</span>
-                  <span class="file-size">({(uploadedFile.size / 1024).toFixed(1)} KB)</span>
-                  <button 
-                    type="button" 
-                    class="file-remove"
-                    onclick={() => { uploadedFile = null; }}
-                    disabled={uploading}
-                  >
-                    ✕
-                  </button>
-                </div>
-              {/if}
-            </div>
-
-            <div class="divider-or">
-              <span>또는</span>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">텍스트 직접 입력</label>
-              <textarea
-                class="form-textarea"
-                bind:value={novelText}
-                placeholder="소설 전체 텍스트를 여기에 붙여넣기 하세요...
-
-최소 100자 이상 입력해주세요. 더 긴 텍스트일수록 더 풍부한 스토리가 생성됩니다."
-                disabled={uploadedFile !== null || uploading}
-              />
-              <div class="textarea-info">
-                {#if uploadedFile}
-                  <span class="text-muted">파일이 선택되어 텍스트 입력이 비활성화되었습니다</span>
-                {:else if novelText.length > 0}
-                  <span class="text-success">
-                    ✓ {novelText.length.toLocaleString()}자 입력됨
-                    {#if novelText.length < 1000}
-                      (최소 1000자 권장)
-                    {/if}
-                  </span>
-                {:else}
-                  <span class="text-muted">소설 텍스트를 입력해주세요 (최소 100자)</span>
-                {/if}
-              </div>
-            </div>
-
-            {#if error}
-              <div class="error-banner">
-                ❌ {error}
-              </div>
-            {/if}
-            
-            {#if uploading}
-              <div class="info-banner">
-                <div class="upload-status">
-                  <div class="upload-icon">⏳</div>
-                  <div class="upload-info">
-                    {#if uploadProgress > 0 && uploadProgress < 100}
-                      <p class="upload-text">S3에 파일 업로드 중...</p>
-                      <div class="upload-progress-bar">
-                        <div class="upload-progress-fill" style="width: {uploadProgress}%"></div>
-                      </div>
-                      <p class="upload-percentage">{uploadProgress.toFixed(1)}%</p>
-                    {:else if uploadProgress === 100}
-                      <p class="upload-text">업로드 완료! 분석을 시작합니다...</p>
-                    {:else}
-                      <p class="upload-text">소설을 업로드하고 있습니다...</p>
-                    {/if}
-                  </div>
-                </div>
-              </div>
-            {:else if canGoNext()}
-              <div class="success-banner">
-                ✅ 준비 완료! 소설 업로드 버튼을 클릭하세요
-              </div>
-            {/if}
-          </div>
-        </div>
+        <Step1Upload
+          title={title}
+          description={description}
+          uploadedFile={uploadedFile}
+          uploading={uploading}
+          uploadProgress={uploadProgress}
+          canGoNext={canGoNext()}
+          error={error}
+          onTitleChange={setTitleValue}
+          onDescriptionChange={setDescriptionValue}
+          onFileChange={handleFileUpload}
+          onRemoveFile={clearUploadedFile}
+        />
 
       {:else if currentStep === 2}
-        <!-- 2단계: 등장인물 자동 추출 -->
-        <div class="content-card">
-          <div class="card-header">
-            <h2 class="card-title">👥 2단계: 등장인물 자동 추출</h2>
-            <p class="card-desc">AI가 소설에서 등장인물을 자동으로 추출합니다</p>
-          </div>
-          <div class="card-body">
-            {#if loadingAnalysis}
-              <div class="extracting-state">
-                <div class="spinner"></div>
-                <p class="extracting-text">AI가 소설을 분석하고 있습니다...</p>
-                <p class="extracting-hint">요약과 등장인물을 추출하는 중...</p>
+        <Step2Characters
+          loadingAnalysis={loadingAnalysis}
+          summary={summary}
+          characters={characters}
+        >
+          {#each characters as character}
+            <button 
+              type="button" 
+              class="character-card"
+              class:expanded={expandedCharacters.has(character.name)}
+              onclick={() => toggleCharacter(character.name)}
+            >
+              <div class="character-avatar">
+                {character.name.charAt(0)}
               </div>
-            {:else if characters.length > 0}
-              <div class="analysis-results">
-                <!-- 요약 -->
-                {#if summary}
-                  <div class="summary-section">
-                    <h3 class="section-subtitle">📖 소설 요약</h3>
-                    <div class="summary-box">
-                      {summary}
-                    </div>
-                  </div>
+              <div class="character-details">
+                <div class="character-name">{character.name}</div>
+                {#if character.aliases && character.aliases.length > 0}
+                  <div class="character-aliases">별칭: {character.aliases.join(', ')}</div>
                 {/if}
-                
-                <!-- 등장인물 -->
-                <div class="characters-section">
-                  <h3 class="section-subtitle">👥 추출된 등장인물</h3>
-                  <div class="character-list">
-                    {#each characters as character}
-                      <div class="character-card">
-                        <div class="character-avatar">
-                          {character.name.charAt(0)}
-                        </div>
-                        <div class="character-details">
-                          <div class="character-name">{character.name}</div>
-                          {#if character.aliases && character.aliases.length > 0}
-                            <div class="character-aliases">별칭: {character.aliases.join(', ')}</div>
-                          {/if}
-                          <div class="character-description">{character.description}</div>
-                        </div>
-                      </div>
-                    {/each}
-                  </div>
+                <div class="character-description" class:expanded={expandedCharacters.has(character.name)}>
+                  {expandedCharacters.has(character.name) 
+                    ? character.description 
+                    : truncate(character.description, 140)}
                 </div>
-                
-                <div class="success-banner">
-                  ✅ 분석 완료! 등장인물 {characters.length}명 추출
+                <div class="character-toggle">
+                  {expandedCharacters.has(character.name) ? '접기' : '더보기'}
                 </div>
               </div>
-            {/if}
-          </div>
-        </div>
+            </button>
+          {/each}
+        </Step2Characters>
 
       {:else if currentStep === 3}
-        <!-- 3단계: 게이지 선택 -->
-        <div class="content-card">
-          <div class="card-header">
-            <h2 class="card-title">📊 3단계: 게이지 선택</h2>
-            <p class="card-desc">스토리에서 사용할 상태 지표를 선택하세요 (최소 2개)</p>
-          </div>
-          <div class="card-body">
-            {#if loadingGauges}
-              <div class="loading-state">
-                <div class="spinner"></div>
-                <p>AI가 소설 주제에 맞는 게이지를 제안하고 있습니다...</p>
-              </div>
-            {:else if proposedGauges.length > 0}
-              <div class="form-group">
-                <label class="form-label">AI가 제안한 게이지 (정확히 2개 선택) <span class="required">*</span></label>
-                <p class="field-hint">소설의 주제와 내용에 맞춰 AI가 선택한 5가지 게이지입니다</p>
-                <div class="gauge-grid">
-                  {#each proposedGauges as gauge}
-                    <button
-                      type="button"
-                      class="gauge-option"
-                      class:selected={selectedGaugeIds.includes(gauge.id)}
-                      onclick={() => toggleGauge(gauge.id)}
-                      disabled={selectingGauges}
-                    >
-                      <div class="gauge-check">
-                        {#if selectedGaugeIds.includes(gauge.id)}
-                          ✓
-                        {/if}
-                      </div>
-                      <div class="gauge-info">
-                        <div class="gauge-name">{gauge.name}</div>
-                        <div class="gauge-desc">{gauge.meaning || gauge.description}</div>
-                        {#if gauge.min_label && gauge.max_label}
-                          <div class="gauge-range">
-                            {gauge.min_label} ↔ {gauge.max_label}
-                          </div>
-                        {/if}
-                      </div>
-                    </button>
-                  {/each}
-                </div>
-                {#if selectedGaugeIds.length > 0}
-                  <p class="selection-count" class:complete={selectedGaugeIds.length === 2}>
-                    {selectedGaugeIds.length}/2 선택됨 {selectedGaugeIds.length === 2 ? '✓' : ''}
-                  </p>
-                {/if}
-              </div>
-            {/if}
-          </div>
-        </div>
+        <Step3Gauges
+          proposedGauges={proposedGauges}
+          selectedGaugeIds={selectedGaugeIds}
+          loadingGauges={loadingGauges}
+          selectingGauges={selectingGauges}
+          toggleGauge={toggleGauge}
+        />
 
       {:else if currentStep === 4}
-        <!-- 4단계: 엔딩 설계 -->
-        <div class="content-card">
-          <div class="card-header">
-            <h2 class="card-title">🎬 4단계: 예상 엔딩 설계</h2>
-            <p class="card-desc">스토리에서 생성할 엔딩의 유형과 개수를 설정하세요</p>
-          </div>
-          <div class="card-body">
-            <div class="form-group">
-              <label class="form-label">엔딩 구성</label>
-              <div class="ending-config">
-                <div class="ending-item">
-                  <label>😊 해피 엔딩</label>
-                  <input type="number" min="0" max="5" bind:value={endingConfig.happy} class="ending-input" />
-                </div>
-                <div class="ending-item">
-                  <label>😢 비극 엔딩</label>
-                  <input type="number" min="0" max="5" bind:value={endingConfig.tragic} class="ending-input" />
-                </div>
-                <div class="ending-item">
-                  <label>😐 중립 엔딩</label>
-                  <input type="number" min="0" max="5" bind:value={endingConfig.neutral} class="ending-input" />
-                </div>
-                <div class="ending-item">
-                  <label>🤔 열린 엔딩</label>
-                  <input type="number" min="0" max="5" bind:value={endingConfig.open} class="ending-input" />
-                </div>
-                <div class="ending-item">
-                  <label>💀 배드 엔딩</label>
-                  <input type="number" min="0" max="5" bind:value={endingConfig.bad} class="ending-input" />
-                </div>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">에피소드 수 (1-10)</label>
-              <div class="slider-container">
-                <input type="range" min="1" max="10" bind:value={numEpisodes} class="slider" />
-                <span class="slider-value">{numEpisodes}화</span>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">분기 깊이 (2-5)</label>
-              <div class="slider-container">
-                <input type="range" min="2" max="5" bind:value={maxDepth} class="slider" />
-                <span class="slider-value">레벨 {maxDepth}</span>
-              </div>
-            </div>
-
-            <div class="info-card">
-              <h3 class="info-title">📊 예상 생성 규모</h3>
-              <ul class="info-list">
-                <li>총 에피소드: <strong>{numEpisodes}화</strong></li>
-                <li>분기 깊이: <strong>레벨 {maxDepth}</strong></li>
-                <li>예상 노드 수: <strong>약 {Math.pow(2, maxDepth) * numEpisodes}개</strong></li>
-                <li>총 엔딩 수: <strong>{Object.values(endingConfig).reduce((a, b) => a + b, 0)}개</strong></li>
-              </ul>
-            </div>
-          </div>
-        </div>
+        <Step4Ending
+          endingConfig={endingConfig}
+          numEpisodes={numEpisodes}
+          maxDepth={maxDepth}
+          numEpisodeEndings={numEpisodeEndings}
+          onEndingChange={handleEndingChange}
+          onNumEpisodesChange={handleNumEpisodesChange}
+          onMaxDepthChange={handleMaxDepthChange}
+          onNumEpisodeEndingsChange={handleNumEpisodeEndingsChange}
+        />
 
       {:else if currentStep === 5}
-        <!-- 5단계: 트리 편집 -->
-        <div class="content-card tree-edit-card">
-          <div class="card-header">
-            <h2 class="card-title">🌳 5단계: 에피소드 트리 편집</h2>
-            <p class="card-desc">
-              {#if treeEditMode}
-                에피소드 {currentEpisode}의 스토리 트리를 검토하고 필요시 수정하세요
-              {:else}
-                AI가 에피소드 {currentEpisode}을(를) 생성하고 있습니다...
-              {/if}
-            </p>
-          </div>
-          <div class="card-body">
-            {#if treeEditMode}
-              <!-- 트리 편집 모드 -->
-              {#if currentEpisodeTree}
-              <div class="tree-edit-layout">
-                <!-- 트리 시각화 영역 -->
-                <div class="tree-panel">
-                  <div class="panel-header">
-                    <span class="panel-title">📊 스토리 트리</span>
-                    <span class="episode-badge">EP {currentEpisode} / {actualTotalEpisodes}</span>
-                  </div>
-                  <div class="tree-scroll-container">
-                    <StoryTree 
-                      rootNode={currentEpisodeTree}
-                      selectedNodeId={selectedNode?.id || ''}
-                      maxDepth={maxDepth}
-                      episodeTitle={currentEpisodeTitle}
-                      on:selectNode={handleNodeSelect}
-                    />
-                  </div>
-                </div>
-                
-                <!-- 노드 편집 패널 -->
-                <div class="editor-panel-container">
-                  <NodeEditor 
-                    node={selectedNode}
-                    isLoading={regenerating}
-                    episodeTitle={currentEpisodeTitle}
-                    episodeOrder={currentEpisode}
-                    on:applyChanges={handleApplyChanges}
-                    on:cancel={() => { selectedNode = null; }}
-                  />
-                </div>
-              </div>
-              
-              <!-- 하단 안내 -->
-              <div class="tree-edit-footer">
-                <div class="edit-instructions">
-                  <p>💡 <strong>사용법:</strong> 노드를 클릭하여 선택 → 내용 수정 → "적용" 버튼 클릭</p>
-                  <p>수정된 노드의 하위 트리가 자동으로 재생성됩니다.</p>
-                </div>
-                
-                <div class="edit-actions">
-                  <Button 
-                    variant="outline"
-                    onclick={() => { 
-                      // 현재 에피소드 스킵하고 다음으로
-                      if (confirm('현재 에피소드를 수정 없이 확정하시겠습니까?')) {
-                        generateNextEpisodeFromTree();
-                      }
-                    }}
-                    disabled={generating || regenerating}
-                  >
-                    {#if currentEpisode >= actualTotalEpisodes}
-                      ✅ 완료하기
-                    {:else}
-                      ⏭️ 다음 에피소드 생성
-                    {/if}
-                  </Button>
-                </div>
-              </div>
-              {:else}
-                <!-- 트리 데이터 없음 -->
-                <div class="empty-tree-state">
-                  <div class="empty-icon">⚠️</div>
-                  <h3 class="empty-title">트리 데이터를 불러올 수 없습니다</h3>
-                  <p class="empty-message">
-                    에피소드가 생성되었지만 트리 구조를 불러오지 못했습니다.
-                  </p>
-                  <div class="empty-actions">
-                    <Button 
-                      onclick={() => { 
-                        if (confirm('현재 에피소드를 건너뛰고 다음 에피소드를 생성하시겠습니까?')) {
-                          generateNextEpisodeFromTree();
-                        }
-                      }}
-                      disabled={generating || regenerating}
-                    >
-                      ⏭️ 다음 에피소드 생성
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onclick={() => {
-                        currentStep = 4;
-                        error = '';
-                      }}
-                    >
-                      ← 설정으로 돌아가기
-                    </Button>
-                  </div>
-                </div>
-              {/if}
-            {:else}
-              <!-- 생성 중 상태 (동기 방식) -->
-              <div class="generating-state">
-                <div class="spinner"></div>
-                <div class="progress-info">
-                  <!-- 에피소드 진행 표시 -->
-                  <div class="episode-progress">
-                    <span class="episode-label">에피소드 생성</span>
-                    <span class="episode-count">{currentEpisode} / {actualTotalEpisodes || numEpisodes}</span>
-                  </div>
-                  
-                  {#if progressMessage}
-                    <p class="progress-message">{progressMessage}</p>
-                  {/if}
-                  
-                  <p class="progress-hint">
-                    AI가 스토리를 생성하고 있습니다. 잠시만 기다려주세요...
-                  </p>
-                  
-                  <!-- 에피소드 상태 표시 -->
-                  <div class="episode-list">
-                    {#each Array(actualTotalEpisodes || numEpisodes) as _, i}
-                      <div 
-                        class="episode-item"
-                        class:completed={i < totalEpisodesGenerated}
-                        class:active={i === totalEpisodesGenerated && generating}
-                      >
-                        {#if i < totalEpisodesGenerated}
-                          ✓
-                        {:else if i === totalEpisodesGenerated && generating}
-                          ⏳
-                        {:else}
-                          {i + 1}
-                        {/if}
-                      </div>
-                    {/each}
-                  </div>
-                </div>
-              </div>
-            {/if}
-            
-            {#if error}
-              <div class="error-banner">
-                ❌ {error}
-              </div>
-            {/if}
-          </div>
-        </div>
+        <Step5Tree
+          treeEditMode={treeEditMode}
+          currentEpisodeTree={currentEpisodeTree}
+          selectedNode={selectedNode}
+          regenerating={regenerating}
+          currentEpisodeTitle={currentEpisodeTitle}
+          currentEpisode={currentEpisode}
+          actualTotalEpisodes={actualTotalEpisodes}
+          generating={generating}
+          progressMessage={progressMessage}
+          totalEpisodesGenerated={totalEpisodesGenerated}
+          numEpisodes={numEpisodes}
+          error={error}
+          maxDepth={maxDepth}
+          onSelectNode={handleNodeSelect}
+          onApplyChanges={handleApplyChanges}
+          onCancelSelect={() => { selectedNode = null; }}
+          onGenerateNextEpisodeFromTree={generateNextEpisodeFromTree}
+          onBackToSettings={() => { currentStep = 4; error = ''; }}
+        />
 
       {:else if currentStep === 6}
-        <!-- 6단계: 에피소드 생성 중 (동기 방식) -->
-        <div class="content-card">
-          <div class="card-header">
-            <h2 class="card-title">✨ 6단계: 에피소드 생성 중</h2>
-            <p class="card-desc">AI가 스토리와 디테일을 생성하고 있습니다...</p>
-          </div>
-          <div class="card-body">
-            <div class="generating-state">
-              <div class="spinner"></div>
-              <div class="progress-info">
-                <!-- 에피소드 진행 표시 -->
-                <div class="episode-progress">
-                  <span class="episode-label">에피소드 생성</span>
-                  <span class="episode-count">{currentEpisode} / {actualTotalEpisodes || numEpisodes}</span>
-                </div>
-                
-                {#if progressMessage}
-                  <p class="progress-message">{progressMessage}</p>
-                {/if}
-                
-                <p class="progress-hint">
-                  동기 방식으로 생성 중입니다. 약 1-2분 소요됩니다...
-                </p>
-                
-                <!-- 에피소드 상태 표시 -->
-                <div class="episode-list">
-                  {#each Array(actualTotalEpisodes || numEpisodes) as _, i}
-                    <div 
-                      class="episode-item"
-                      class:completed={i < totalEpisodesGenerated}
-                      class:active={i === totalEpisodesGenerated && generating}
-                    >
-                      {#if i < totalEpisodesGenerated}
-                        ✓
-                      {:else if i === totalEpisodesGenerated && generating}
-                        ⏳
-                      {:else}
-                        {i + 1}
-                      {/if}
-                    </div>
-                  {/each}
-                </div>
-              </div>
-            </div>
-            {#if error}
-              <div class="error-state">
-                <div class="error-icon">❌</div>
-                <h3 class="error-title">생성 실패</h3>
-                <div class="error-detail">
-                  {#each error.split('\n') as line}
-                    <p class="error-line">{line}</p>
-                  {/each}
-                </div>
-                <div class="error-actions">
-                  <Button onclick={() => { currentStep = 4; error = ''; }}>
-                    ← 설정 수정
-                  </Button>
-                  <Button variant="outline" onclick={() => { 
-                    console.log('=== 에러 상세 정보 ===');
-                    console.log('storyId:', storyId);
-                    console.log('currentEpisode:', currentEpisode);
-                    console.log('totalEpisodesGenerated:', totalEpisodesGenerated);
-                    console.log('error:', error);
-                    console.log('progressMessage:', progressMessage);
-                    alert('콘솔(F12)에서 상세 정보를 확인하세요');
-                  }}>
-                    🔍 콘솔에서 자세히 보기
-                  </Button>
-                </div>
-              </div>
-            {/if}
-          </div>
-        </div>
+        <Step6Generating
+          generating={generating}
+          progressMessage={progressMessage}
+          currentEpisode={currentEpisode}
+          actualTotalEpisodes={actualTotalEpisodes}
+          numEpisodes={numEpisodes}
+          totalEpisodesGenerated={totalEpisodesGenerated}
+          error={error}
+          onBackToStep4={() => { currentStep = 4; error = ''; }}
+        />
 
       {:else if currentStep === 7}
-        <!-- 7단계: 완료 -->
-        <div class="content-card">
-          <div class="card-header">
-            <h2 class="card-title">🎉 4단계: 생성 완료!</h2>
-            <p class="card-desc">인터랙티브 스토리가 성공적으로 생성되었습니다</p>
-          </div>
-          <div class="card-body">
-            {#if metadata && storyDataId}
-              <div class="success-state">
-                <div class="success-icon">✨</div>
-                <h3 class="success-title">{metadata.title}</h3>
-                {#if metadata.description}
-                  <p class="success-desc">{metadata.description}</p>
-                {/if}
-                
-                <div class="story-stats">
-                  <div class="stat-item">
-                    <span class="stat-label">총 에피소드</span>
-                    <span class="stat-value">{metadata.totalEpisodes}화</span>
-                  </div>
-                  <div class="stat-item">
-                    <span class="stat-label">총 노드</span>
-                    <span class="stat-value">{metadata.totalNodes}개</span>
-                  </div>
-                  <div class="stat-item">
-                    <span class="stat-label">게이지 수</span>
-                    <span class="stat-value">{metadata.totalGauges}개</span>
-                  </div>
-                  <div class="stat-item">
-                    <span class="stat-label">생성일</span>
-                    <span class="stat-value">{new Date(metadata.createdAt).toLocaleDateString('ko-KR')}</span>
-                  </div>
-                </div>
-
-                <div class="action-buttons">
-                  <Button size="lg" onclick={startPlaying}>
-                    🎮 지금 플레이하기
-                  </Button>
-                  <Button size="lg" variant="outline" onclick={createNew}>
-                    ➕ 새로 만들기
-                  </Button>
-                </div>
-              </div>
-            {/if}
-          </div>
-        </div>
+        <Step7Complete
+          metadata={metadata}
+          storyDataId={storyDataId}
+          startPlaying={startPlaying}
+          createNew={createNew}
+        />
       {/if}
     </div>
 
@@ -1502,86 +1103,118 @@
   </div>
 </div>
 
+<svelte:head>
 <style>
   .wizard-page {
     min-height: calc(100vh - 60px);
-    background: linear-gradient(135deg, 
-      hsl(var(--primary) / 0.1), 
-      hsl(var(--accent) / 0.1)
-    );
-    padding: 2rem;
+    background: hsl(0 0% 4%);
+    padding: 2.5rem 1.5rem;
   }
 
   .wizard-container {
-    max-width: 900px;
+    max-width: 1200px;
+    width: min(1200px, 96vw);
     margin: 0 auto;
   }
 
   /* 헤더 */
   .wizard-header {
     text-align: center;
-    margin-bottom: 3rem;
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid hsl(var(--border));
   }
 
   .wizard-title {
-    font-size: 3rem;
-    font-weight: 900;
-    margin-bottom: 1rem;
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 0.75rem;
     color: hsl(var(--foreground));
+    letter-spacing: -0.02em;
   }
 
   .wizard-subtitle {
-    font-size: 1.125rem;
+    font-size: 1rem;
     color: hsl(var(--muted-foreground));
+    line-height: 1.6;
   }
 
   /* 진행 단계 */
   .progress-bar-container {
-    background: hsl(var(--card));
+    background: linear-gradient(135deg, hsl(var(--card) / 0.9), hsl(var(--card) / 0.8));
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius-lg);
-    padding: 2rem;
+    padding: 1.75rem;
     margin-bottom: 2rem;
+    box-shadow:
+      0 4px 18px hsl(var(--foreground) / 0.15),
+      0 0 0 1px hsl(var(--card) / 0.7);
+    backdrop-filter: blur(6px);
   }
 
   .steps-container {
     display: flex;
     justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
   }
 
   .step-wrapper {
     flex: 1;
     display: flex;
     align-items: center;
+    min-width: 0;
   }
 
   .step-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
+    width: 100%;
   }
 
   .step-circle {
-    width: 3rem;
-    height: 3rem;
+    width: 2.5rem;
+    height: 2.5rem;
     border-radius: 50%;
     border: 2px solid hsl(var(--border));
-    background: hsl(var(--muted));
-    color: hsl(var(--muted-foreground));
+    background: radial-gradient(circle, hsl(var(--muted) / 0.2) 0%, hsl(var(--muted) / 0.05) 60%, transparent 100%);
+    color: hsl(var(--foreground));
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 1.125rem;
-    transition: all 0.3s;
+    font-size: 0.9375rem;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
   }
 
   .step-circle.active {
-    background: hsl(var(--primary));
-    border-color: hsl(var(--primary));
+    background: radial-gradient(circle at 50% 40%, #ff4d4f, #d9353a);
+    border-color: #ff4d4f;
     color: white;
-    transform: scale(1.1);
+    transform: scale(1.15);
+    box-shadow: 
+      0 0 0 4px #ff4d4f44,
+      0 0 20px #ff4d4f88,
+      0 0 40px #ff4d4f66;
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 
+        0 0 0 4px hsl(var(--primary) / 0.2),
+        0 0 20px hsl(var(--primary) / 0.6),
+        0 0 40px hsl(var(--primary) / 0.4);
+    }
+    50% {
+      box-shadow: 
+        0 0 0 8px hsl(var(--primary) / 0.3),
+        0 0 30px hsl(var(--primary) / 0.8),
+        0 0 60px hsl(var(--primary) / 0.6);
+    }
   }
 
   .step-circle.completed {
@@ -1592,29 +1225,71 @@
 
   .step-info {
     text-align: center;
+    width: 100%;
   }
 
   .step-title {
-    font-weight: 600;
-    font-size: 0.875rem;
+    font-weight: 700;
+    font-size: 0.9rem;
     color: hsl(var(--foreground));
+    margin-bottom: 0.35rem;
+    transition: all 0.3s ease;
+  }
+
+  .step-title.active-title {
+    color: #ff4d4f;
+    text-shadow: 0 0 8px #ff4d4fcc;
+  }
+
+  .step-title.completed-title {
+    color: hsl(142 76% 45%);
   }
 
   .step-desc {
-    font-size: 0.75rem;
+    transition: all 0.3s ease;
     color: hsl(var(--muted-foreground));
+  }
+
+  .step-desc.active-desc {
+    color: #ffd7d8;
+    text-shadow: 0 0 6px #ff4d4fcc;
+  }
+
+  .step-desc.completed-desc {
+    color: hsl(142 76% 45%);
+  }
+
+  .step-desc {
+    font-size: 0.6875rem;
+    color: hsl(var(--muted-foreground));
+    line-height: 1.4;
   }
 
   .step-connector {
     flex: 1;
     height: 2px;
     background: hsl(var(--border));
-    margin: 0 0.5rem;
-    margin-bottom: 3rem;
+    margin: 0 0.25rem;
+    margin-top: -1.25rem;
+    transition: all 0.3s ease;
   }
 
   .step-connector.completed {
     background: hsl(142 76% 36%);
+  }
+
+  .step-connector.active {
+    background: linear-gradient(90deg, hsl(142 76% 36%), hsl(var(--primary)));
+    animation: connector-flow 2s ease-in-out infinite;
+  }
+
+  @keyframes connector-flow {
+    0%, 100% {
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 1;
+    }
   }
 
   /* 콘텐츠 카드 */
@@ -1624,56 +1299,119 @@
 
   .content-card {
     background: hsl(var(--card));
-    border: 1px solid hsl(var(--border));
+    border: none;
     border-radius: var(--radius-lg);
     overflow: hidden;
+    box-shadow: 0 2px 8px hsl(var(--foreground) / 0.05);
   }
 
   .card-header {
-    padding: 2rem;
-    border-bottom: 1px solid hsl(var(--border));
+    padding: 1.75rem 2rem;
+    border-bottom: 2px solid hsl(0 0% 50% / 0.3);
+    background: hsl(var(--muted) / 0.3);
   }
 
   .card-title {
-    font-size: 1.5rem;
+    font-size: 1.375rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
     color: hsl(var(--foreground));
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .card-desc {
     color: hsl(var(--muted-foreground));
+    font-size: 0.9375rem;
+    line-height: 1.5;
   }
 
   .card-body {
     padding: 2rem;
+    background: hsl(var(--card));
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* 섹션 블록 */
+  .section-block {
+    margin-bottom: 2.5rem;
+    background: hsl(var(--muted) / 0.4);
+    border: 3px solid hsl(0 0% 50% / 0.5);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: 0 4px 12px hsl(var(--foreground) / 0.15);
+  }
+
+  .section-block:last-child {
+    margin-bottom: 0;
+  }
+
+  .section-header {
+    padding: 1.25rem 1.5rem;
+    background: hsl(var(--muted) / 0.6);
+    border-bottom: 2px solid hsl(0 0% 50% / 0.3);
+  }
+
+  .section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+    margin: 0 0 0.25rem 0;
+  }
+
+  .section-subtitle {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+    margin: 0;
+  }
+
+  .section-content {
+    padding: 1.5rem;
+    background: hsl(var(--muted) / 0.1);
   }
 
   /* 폼 요소 */
   .form-group {
-    margin-bottom: 1.5rem;
+    margin-bottom: 0;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 0;
+  }
+
+  .form-group-half {
+    margin-bottom: 0;
   }
 
   .form-label {
     display: block;
     font-weight: 600;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.625rem;
     color: hsl(var(--foreground));
+    font-size: 0.9375rem;
   }
 
   .form-input {
     width: 100%;
-    padding: 0.75rem;
+    padding: 0.875rem 1rem;
     background: hsl(var(--background));
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius-md);
     color: hsl(var(--foreground));
-    font-size: 1rem;
+    font-size: 0.9375rem;
+    transition: all 0.2s ease;
   }
 
   .form-input:focus {
     outline: none;
     border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
   }
 
   .form-textarea {
@@ -1685,17 +1423,24 @@
     border-radius: var(--radius-md);
     color: hsl(var(--foreground));
     font-size: 0.875rem;
-    font-family: monospace;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
     resize: vertical;
+    line-height: 1.6;
+    transition: all 0.2s ease;
+  }
+
+  .input-method-card .form-textarea {
+    min-height: 280px;
   }
 
   .form-textarea:focus {
     outline: none;
     border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
   }
 
   .form-textarea:disabled {
-    opacity: 0.5;
+    opacity: 0.6;
     cursor: not-allowed;
     background: hsl(var(--muted) / 0.3);
   }
@@ -1706,19 +1451,91 @@
   }
 
   /* 파일 업로드 */
+  .file-upload-wrapper {
+    position: relative;
+    width: 100%;
+  }
+
+  .file-input-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .file-upload-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 1rem 1.5rem;
+    background: hsl(var(--primary));
+    color: white;
+    border: 3px solid hsl(0 0% 50% / 0.5);
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .file-upload-button:hover:not(:disabled) {
+    background: hsl(var(--primary) / 0.9);
+    border-color: hsl(0 0% 50% / 0.7);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px hsl(var(--primary) / 0.3);
+  }
+
+  .file-upload-button:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .file-upload-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .file-upload-icon {
+    font-size: 1.25rem;
+  }
+
+  .file-upload-text {
+    font-size: 1rem;
+  }
+
+  .file-input {
+    width: 100%;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    color: hsl(var(--foreground));
+    cursor: pointer;
+  }
+
   .file-info {
     margin-top: 0.75rem;
-    padding: 1rem;
-    background: hsl(var(--muted) / 0.3);
+    padding: 1rem 1.25rem;
+    background: hsl(var(--muted) / 0.2);
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius-md);
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.875rem;
+    transition: all 0.2s ease;
+  }
+
+  .file-info:hover {
+    background: hsl(var(--muted) / 0.3);
   }
 
   .file-icon {
     font-size: 1.5rem;
+    flex-shrink: 0;
   }
 
   .file-name {
@@ -1728,11 +1545,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 0.9375rem;
   }
 
   .file-size {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     color: hsl(var(--muted-foreground));
+    flex-shrink: 0;
   }
 
   .file-remove {
@@ -1746,14 +1565,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1rem;
-    transition: all 0.2s;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
   }
 
   .file-remove:hover:not(:disabled) {
     background: hsl(0 84.2% 60.2% / 0.1);
     border-color: hsl(0 84.2% 60.2%);
     color: hsl(0 84.2% 60.2%);
+    transform: scale(1.1);
   }
 
   .file-remove:disabled {
@@ -1761,7 +1582,62 @@
     cursor: not-allowed;
   }
 
-  /* 구분선 */
+  /* 입력 방법 레이아웃 */
+  .input-methods {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .input-method-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: hsl(var(--background));
+    border: none;
+    border-radius: var(--radius-md);
+  }
+
+  .method-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .divider-vertical {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1rem;
+    position: relative;
+  }
+
+  .divider-vertical::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    background: hsl(var(--border));
+    transform: translateX(-50%);
+  }
+
+  .divider-vertical span {
+    position: relative;
+    z-index: 1;
+    padding: 0.5rem 0.75rem;
+    background: hsl(var(--card));
+    color: hsl(var(--muted-foreground));
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border-radius: var(--radius-full);
+    border: 1px solid hsl(var(--border));
+  }
+
+  /* 구분선 (기존 - 사용 안 함) */
   .divider-or {
     position: relative;
     text-align: center;
@@ -1816,6 +1692,24 @@
     margin-bottom: 0.5rem;
   }
 
+  .upload-processing {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: hsl(var(--foreground));
+    font-weight: 700;
+  }
+
+  .inline-spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 3px solid #ffffff44;
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    flex-shrink: 0;
+  }
+
   .upload-progress-bar {
     width: 100%;
     height: 0.5rem;
@@ -1854,33 +1748,44 @@
   }
 
   .success-banner {
-    padding: 1rem;
+    padding: 1rem 1.25rem;
     background: hsl(142 76% 36% / 0.1);
-    border: 1px solid hsl(142 76% 36%);
+    border: 1px solid hsl(142 76% 36% / 0.3);
     border-radius: var(--radius-md);
     color: hsl(142 76% 36%);
     font-weight: 600;
     text-align: center;
+    font-size: 0.9375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
   }
 
   .error-banner {
-    padding: 1rem;
+    padding: 1rem 1.25rem;
     background: hsl(0 84.2% 60.2% / 0.1);
-    border: 1px solid hsl(0 84.2% 60.2%);
+    border: 1px solid hsl(0 84.2% 60.2% / 0.3);
     border-radius: var(--radius-md);
     color: hsl(0 84.2% 60.2%);
     font-weight: 600;
     text-align: center;
+    font-size: 0.9375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
   }
 
   .info-banner {
-    padding: 1rem;
+    padding: 1rem 1.25rem;
     background: hsl(var(--primary) / 0.1);
-    border: 1px solid hsl(var(--primary));
+    border: 1px solid hsl(var(--primary) / 0.3);
     border-radius: var(--radius-md);
     color: hsl(var(--primary));
     font-weight: 600;
     text-align: center;
+    font-size: 0.9375rem;
   }
 
   /* 슬라이더 */
@@ -1927,32 +1832,39 @@
 
   .gauge-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.25rem;
     margin-top: 1rem;
+    padding: 1rem;
+    background: hsl(var(--muted) / 0.1);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
   }
 
   .gauge-option {
     display: flex;
     align-items: flex-start;
-    gap: 0.75rem;
-    padding: 1rem;
+    gap: 0.875rem;
+    padding: 1.25rem;
     background: hsl(var(--card));
     border: 2px solid hsl(var(--border));
     border-radius: var(--radius-md);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
     text-align: left;
   }
 
   .gauge-option:hover {
-    border-color: hsl(var(--primary));
-    background: hsl(var(--muted) / 0.3);
+    border-color: hsl(var(--primary) / 0.5);
+    background: hsl(var(--muted) / 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px hsl(var(--foreground) / 0.05);
   }
 
   .gauge-option.selected {
     border-color: hsl(var(--primary));
     background: hsl(var(--primary) / 0.1);
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
   }
 
   .gauge-check {
@@ -1998,9 +1910,9 @@
 
   .info-card {
     padding: 1.5rem;
-    background: hsl(var(--muted) / 0.3);
+    background: hsl(var(--muted) / 0.2);
+    border: 2px solid hsl(var(--primary) / 0.3);
     border-radius: var(--radius-md);
-    margin-top: 1.5rem;
   }
 
   .info-title {
@@ -2187,11 +2099,15 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 1.5rem 0;
+    border-top: 1px solid hsl(var(--border));
+    margin-top: 2rem;
   }
 
   .step-indicator {
     font-weight: 600;
     color: hsl(var(--muted-foreground));
+    font-size: 0.9375rem;
   }
 
   /* 등장인물 */
@@ -2250,17 +2166,45 @@
   }
 
   .character-name {
-    font-weight: 600;
+    font-weight: 700;
     color: hsl(var(--foreground));
-    text-align: center;
+    text-align: left;
+    font-size: 1rem;
+  }
+
+  /* 설정 레이아웃 */
+  .config-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .config-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+    padding: 1.5rem;
+    background: hsl(var(--muted) / 0.1);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+  }
+
+  .config-sidebar {
+    position: sticky;
+    top: 2rem;
   }
 
   /* 엔딩 설정 */
   .ending-config {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 1rem;
     margin-top: 1rem;
+    padding: 1rem;
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
   }
 
   .ending-item {
@@ -2297,6 +2241,36 @@
     gap: 2rem;
   }
 
+  .analysis-layout {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .summary-section {
+    padding: 1.5rem;
+    background: hsl(var(--muted) / 0.15);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+    max-height: 360px;
+    overflow: auto;
+  }
+
+  .characters-section {
+    padding: 1.5rem;
+    background: hsl(var(--muted) / 0.15);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+  }
+
+  .section-subtitle-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+  }
+
   .section-subtitle {
     font-size: 1.25rem;
     font-weight: 700;
@@ -2304,27 +2278,64 @@
     color: hsl(var(--foreground));
   }
 
+  .section-hint {
+    font-size: 0.85rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .count-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: 0.5rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: hsl(var(--primary) / 0.15);
+    color: hsl(var(--primary));
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
   .summary-box {
-    padding: 1.5rem;
-    background: hsl(var(--muted) / 0.3);
+    padding: 1.25rem;
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
     border-radius: var(--radius-md);
     line-height: 1.8;
     color: hsl(var(--foreground));
+    margin-top: 1rem;
   }
 
   .character-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+    margin-top: 1rem;
   }
 
   .character-card {
     display: flex;
     gap: 1rem;
-    padding: 1.5rem;
-    background: hsl(var(--card));
-    border: 1px solid hsl(var(--border));
+    padding: 1rem 1rem 0.75rem 1rem;
+    background: hsl(var(--background));
+    border: 1.5px solid hsl(var(--border));
     border-radius: var(--radius-md);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    text-align: left;
+    box-shadow: 0 2px 8px hsl(var(--foreground) / 0.08);
+  }
+
+  .character-card:hover {
+    border-color: hsl(var(--primary) / 0.3);
+    box-shadow: 0 4px 12px hsl(var(--foreground) / 0.08);
+    background: hsl(var(--muted) / 0.1);
+  }
+
+  .character-card.expanded {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 6px 16px hsl(var(--primary) / 0.15);
+    background: hsl(var(--muted) / 0.15);
   }
 
   .character-details {
@@ -2338,9 +2349,31 @@
   }
 
   .character-description {
-    margin-top: 0.5rem;
-    line-height: 1.6;
+    margin-top: 0.35rem;
+    line-height: 1.55;
     color: hsl(var(--foreground));
+    max-height: 4.6rem;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .character-description:not(.expanded)::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 55%, hsl(var(--background)) 100%);
+    pointer-events: none;
+  }
+
+  .character-description.expanded {
+    max-height: none;
+  }
+
+  .character-toggle {
+    margin-top: 0.6rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: hsl(var(--primary));
   }
 
   .extracting-hint {
@@ -2372,6 +2405,8 @@
   /* 트리 편집 레이아웃 */
   .tree-edit-card {
     min-height: 600px;
+    overflow: auto;
+    overflow-x: auto;
   }
 
   .tree-edit-layout {
@@ -2379,6 +2414,9 @@
     grid-template-columns: 1fr 350px;
     gap: 1.5rem;
     min-height: 500px;
+    overflow: auto;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
   }
 
   .tree-panel {
@@ -2387,7 +2425,9 @@
     border-radius: var(--radius-md);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: auto;
+    min-width: 360px;
+    overflow-x: auto;
   }
 
   .panel-header {
@@ -2417,10 +2457,12 @@
     flex: 1;
     overflow: auto;
     padding: 1rem;
+    max-height: 70vh;
   }
 
   .editor-panel-container {
     min-height: 400px;
+    min-width: 320px;
   }
 
   .tree-edit-footer {
@@ -2579,24 +2621,101 @@
     justify-content: center;
   }
 
+  @media (max-width: 1024px) {
+    .input-methods {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    .divider-vertical {
+      display: none;
+    }
+
+    .analysis-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .character-list {
+      grid-template-columns: 1fr;
+    }
+
+    .config-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .config-sidebar {
+      position: static;
+    }
+  }
+
   @media (max-width: 768px) {
+    .wizard-page {
+      padding: 1.5rem 1rem;
+    }
+
     .wizard-title {
       font-size: 2rem;
     }
 
+    .wizard-header {
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+    }
+
+    .progress-bar-container {
+      padding: 1.25rem;
+    }
+
     .steps-container {
-      flex-direction: column;
+      flex-wrap: wrap;
       gap: 1rem;
+    }
+
+    .step-wrapper {
+      flex: 0 0 calc(50% - 0.5rem);
+      min-width: 0;
     }
 
     .step-connector {
       display: none;
     }
 
+    .card-header {
+      padding: 1.5rem;
+    }
+
+    .card-body {
+      padding: 1.5rem;
+    }
+
+    .form-row {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
     .story-stats {
       flex-direction: column;
       gap: 1rem;
     }
+
+    .navigation {
+      flex-direction: column;
+      gap: 1rem;
+      align-items: stretch;
+    }
+
+    .step-indicator {
+      text-align: center;
+    }
+
+    .gauge-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .ending-config {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 </style>
+</svelte:head>
 

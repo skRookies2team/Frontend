@@ -37,7 +37,7 @@
   
   function getNodeColor(depth: number): string {
     const colors = [
-      'hsl(250, 70%, 60%)',   // depth 0 - 보라
+      'hsl(0, 85%, 55%)',   // depth 0 - 빨강
       'hsl(200, 70%, 50%)',   // depth 1 - 파랑
       'hsl(160, 70%, 45%)',   // depth 2 - 초록
       'hsl(45, 80%, 50%)',    // depth 3 - 주황
@@ -210,7 +210,8 @@
   .connector-line {
     width: 2px;
     height: 1.5rem;
-    background: hsl(var(--border));
+    background: #00e0ff;
+    box-shadow: 0 0 6px rgba(0, 224, 255, 0.7);
   }
   
   .children-nodes {
@@ -227,7 +228,8 @@
     transform: translateX(-50%);
     width: calc(100% - 180px);
     height: 2px;
-    background: hsl(var(--border));
+    background: #00e0ff;
+    box-shadow: 0 0 6px rgba(0, 224, 255, 0.7);
   }
   
   .children-nodes > .node-branch {
@@ -242,7 +244,8 @@
     transform: translateX(-50%);
     width: 2px;
     height: 1rem;
-    background: hsl(var(--border));
+    background: #00e0ff;
+    box-shadow: 0 0 6px rgba(0, 224, 255, 0.7);
   }
   
   .children-nodes > .node-branch > .tree-node {

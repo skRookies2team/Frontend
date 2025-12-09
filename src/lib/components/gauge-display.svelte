@@ -62,7 +62,7 @@
     );
     border-radius: 999px;
     transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 0 12px hsla(250 100% 70% / 0.4);
+    box-shadow: 0 0 12px hsla(0 90% 48% / 0.4);
   }
   
   .gauge-marker {
@@ -76,7 +76,7 @@
     transform: translate(-50%, -50%);
     box-shadow: 
       0 4px 12px rgba(0, 0, 0, 0.4),
-      0 0 0 2px hsla(250 100% 70% / 0.3);
+      0 0 0 2px hsla(0 90% 48% / 0.3);
     transition: left 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     animation: pulse 2s ease-in-out infinite;
   }
@@ -85,13 +85,13 @@
     0%, 100% {
       box-shadow: 
         0 4px 12px rgba(0, 0, 0, 0.4),
-        0 0 0 2px hsla(250 100% 70% / 0.3);
+        0 0 0 2px hsla(0 90% 48% / 0.3);
     }
     50% {
       box-shadow: 
         0 4px 12px rgba(0, 0, 0, 0.4),
-        0 0 0 4px hsla(250 100% 70% / 0.5),
-        0 0 12px hsla(250 100% 70% / 0.4);
+        0 0 0 4px hsla(0 90% 48% / 0.5),
+        0 0 12px hsla(0 90% 48% / 0.4);
     }
   }
 </style>

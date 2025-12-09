@@ -9,6 +9,20 @@
   let selectedCategory = $state('전체');
   let searchQuery = $state('');
   let isLoggedIn = $state(false);
+  let categoryDropdownOpen = $state(false);
+  let recommendationDropdownOpen = $state(false);
+  let viewMode = $state<'grid' | 'list'>('grid');
+  let categoryDropdownRef: HTMLElement | null = $state(null);
+  let recommendationDropdownRef: HTMLElement | null = $state(null);
+
+  function handleClickOutside(event: MouseEvent) {
+    if (categoryDropdownRef && !categoryDropdownRef.contains(event.target as Node)) {
+      categoryDropdownOpen = false;
+    }
+    if (recommendationDropdownRef && !recommendationDropdownRef.contains(event.target as Node)) {
+      recommendationDropdownOpen = false;
+    }
+  }
   
   // 카테고리는 임시로 하드코딩 (백엔드에 카테고리 정보가 없으므로)
   const categories = ['전체', '고전문학', 'SF', '추리', '판타지', '로맨스', '교육'];
@@ -24,6 +38,12 @@
     } finally {
       loading = false;
     }
+
+    // 외부 클릭 감지
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
   });
   
   let filteredStories = $derived.by(() => {
@@ -48,48 +68,117 @@
 
 <div class="platform">
   <main class="main-content">
-    <aside class="sidebar-left">
-      <div class="sidebar-section">
-        <h3 class="sidebar-title">카테고리</h3>
-        <div class="category-pills">
-          {#each categories as category}
+    <!-- Netflix Style Header -->
+    <div class="netflix-header">
+      <div class="header-left">
+        <h1 class="page-title">시리즈</h1>
+        <div class="header-dropdowns">
+          <div class="dropdown-wrapper" bind:this={categoryDropdownRef}>
             <button 
               type="button"
-              class="category-pill"
-              class:active={selectedCategory === category}
-              onclick={() => selectedCategory = category}
-              aria-label={category}
+              class="header-dropdown-trigger"
+              onclick={(e) => {
+                e.stopPropagation();
+                categoryDropdownOpen = !categoryDropdownOpen;
+              }}
+              aria-expanded={categoryDropdownOpen}
             >
-              <span>{category}</span>
+              <span>장르</span>
+              <svg 
+                class="dropdown-icon" 
+                class:open={categoryDropdownOpen}
+                width="12" 
+                height="12" 
+                viewBox="0 0 12 12" 
+                fill="none"
+              >
+                <path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
             </button>
-          {/each}
+            {#if categoryDropdownOpen}
+              <div class="header-dropdown-menu" onclick={(e) => e.stopPropagation()}>
+                {#each categories as category}
+                  <button 
+                    type="button"
+                    class="header-dropdown-item"
+                    class:active={selectedCategory === category}
+                    onclick={() => {
+                      selectedCategory = category;
+                      categoryDropdownOpen = false;
+                    }}
+                  >
+                    {category}
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </div>
+          
+          <div class="dropdown-wrapper" bind:this={recommendationDropdownRef}>
+            <button 
+              type="button"
+              class="header-dropdown-trigger"
+              onclick={(e) => {
+                e.stopPropagation();
+                recommendationDropdownOpen = !recommendationDropdownOpen;
+              }}
+              aria-expanded={recommendationDropdownOpen}
+            >
+              <span>추천 콘텐츠</span>
+              <svg 
+                class="dropdown-icon" 
+                class:open={recommendationDropdownOpen}
+                width="12" 
+                height="12" 
+                viewBox="0 0 12 12" 
+                fill="none"
+              >
+                <path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            {#if recommendationDropdownOpen}
+              <div class="header-dropdown-menu" onclick={(e) => e.stopPropagation()}>
+                <button type="button" class="header-dropdown-item">인기 콘텐츠</button>
+                <button type="button" class="header-dropdown-item">최신 등록</button>
+                <button type="button" class="header-dropdown-item">추천 콘텐츠</button>
+              </div>
+            {/if}
+          </div>
         </div>
       </div>
       
-      {#if !isLoggedIn}
-        <div class="sidebar-section">
-          <h3 class="sidebar-title">로그인하고</h3>
-          <p class="sidebar-text">모든 기능을 자유롭게 이용하세요</p>
-          <div class="login-buttons">
-            <button type="button" class="social-btn kakao" aria-label="카카오 로그인" onclick={() => window.location.href = '/login'}>
-              <span class="social-icon">💬</span>
-            </button>
-            <button type="button" class="social-btn google" aria-label="구글 로그인" onclick={() => window.location.href = '/login'}>
-              <span class="social-icon">G</span>
-            </button>
-          </div>
+      <div class="header-right">
+        <div class="view-toggle">
+          <button 
+            type="button"
+            class="view-toggle-btn"
+            class:active={viewMode === 'list'}
+            onclick={() => viewMode = 'list'}
+            aria-label="리스트 뷰"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor"/>
+              <rect x="2" y="7" width="12" height="2" rx="1" fill="currentColor"/>
+              <rect x="2" y="11" width="12" height="2" rx="1" fill="currentColor"/>
+            </svg>
+          </button>
+          <button 
+            type="button"
+            class="view-toggle-btn"
+            class:active={viewMode === 'grid'}
+            onclick={() => viewMode = 'grid'}
+            aria-label="그리드 뷰"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="5" height="5" rx="1" fill="currentColor"/>
+              <rect x="9" y="2" width="5" height="5" rx="1" fill="currentColor"/>
+              <rect x="2" y="9" width="5" height="5" rx="1" fill="currentColor"/>
+              <rect x="9" y="9" width="5" height="5" rx="1" fill="currentColor"/>
+            </svg>
+          </button>
         </div>
-        
-        <div class="sidebar-section">
-          <p class="sidebar-text small">다른 방법으로 시작하기</p>
-        </div>
-      {:else}
-        <div class="sidebar-section">
-          <h3 class="sidebar-title">🏆 랭킹</h3>
-          <p class="sidebar-text">인기 있는 스토리를 확인하세요</p>
-        </div>
-      {/if}
-    </aside>
+      </div>
+    </div>
     
     <div class="content-area">
       {#if loading}
@@ -103,55 +192,39 @@
           <Button onclick={() => window.location.reload()}>다시 시도</Button>
         </div>
       {:else}
-        <!-- Story Cards Grid -->
-        <div class="cards-grid">
-          {#each filteredStories as story}
-            <article class="story-card">
-              <div class="card-image">
-                <img src="/placeholder.svg" alt={story.title} />
-                <div class="card-badge">스토리</div>
-              </div>
-              <div class="card-content">
-                <h3 class="card-title">{story.title}</h3>
-                <p class="card-description">{story.description || '설명이 없습니다'}</p>
-                <div class="card-meta">
-                  <span class="meta-item">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <path d="M2 3h12v10H2z" stroke="currentColor" stroke-width="1.5"/>
-                      <path d="M6 7h4M6 10h4" stroke="currentColor" stroke-width="1.5"/>
-                    </svg>
-                    {story.totalEpisodes}화
-                  </span>
-                  <span class="meta-item">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <path d="M8 1l2 4 4.5.5-3.25 3 .75 4.5L8 11l-4 2 .75-4.5L1.5 5.5 6 5z" fill="currentColor"/>
-                    </svg>
-                    {story.totalNodes}개 노드
-                  </span>
+        <!-- Netflix Style Content Grid -->
+        <div class="netflix-content">
+          {#if filteredStories.length > 0}
+            <div class="netflix-grid" class:list-view={viewMode === 'list'}>
+              {#each filteredStories as story}
+                <div class="netflix-card" onclick={() => startStory(story)}>
+                  <div class="netflix-card-image">
+                    <img src="/placeholder.svg" alt={story.title} />
+                    {#if Math.random() > 0.7}
+                      <div class="top10-badge">TOP 10</div>
+                    {/if}
+                  </div>
+                  <div class="netflix-card-info">
+                    <h3 class="netflix-card-title">{story.title}</h3>
+                    <p class="netflix-card-episode">
+                      {#if Math.random() > 0.5}
+                        새로운 에피소드 지금 시청하기
+                      {:else}
+                        다음 에피소드 {['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'][Math.floor(Math.random() * 7)]}
+                      {/if}
+                    </p>
+                  </div>
                 </div>
-                <div class="card-date">
-                  {new Date(story.createdAt).toLocaleDateString('ko-KR')}
-                </div>
-                <Button 
-                  class="w-full" 
-                  variant="outline"
-                  onclick={() => startStory(story)}
-                  aria-label={`${story.title} 시작하기`}
-                >
-                  시작하기
-                </Button>
-              </div>
-            </article>
-          {/each}
+              {/each}
+            </div>
+          {:else}
+            <div class="empty-state">
+              <p class="empty-icon">📚</p>
+              <h3 class="empty-title">스토리가 없습니다</h3>
+              <p class="empty-text">새로운 스토리를 만들어보세요</p>
+            </div>
+          {/if}
         </div>
-        
-        {#if filteredStories.length === 0}
-          <div class="empty-state">
-            <p class="empty-icon">📚</p>
-            <h3 class="empty-title">스토리가 없습니다</h3>
-            <p class="empty-text">새로운 스토리를 만들어보세요</p>
-          </div>
-        {/if}
       {/if}
     </div>
   </main>
@@ -160,349 +233,263 @@
 <style>
   .platform {
     min-height: calc(100vh - 60px);
+    background: hsl(var(--background));
+    padding-bottom: 4rem;
   }
 
   .main-content {
-    max-width: 1440px;
-    margin: 0 auto;
-    padding: 2rem;
-    display: grid;
-    grid-template-columns: 240px 1fr;
-    gap: 3rem;
-  }
-
-  .sidebar-left {
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
+  }
+
+  /* Netflix Style Header */
+  .netflix-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2rem 4%;
+    background: hsl(var(--background));
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
     gap: 2rem;
   }
 
-  .sidebar-section {
-    position: relative;
-    background: linear-gradient(135deg, hsl(240 12% 12%), hsl(240 12% 10%));
-    border: 1px solid hsl(var(--border));
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
-    box-shadow: var(--glow-card);
-    transition: all 0.3s ease;
-  }
-  
-  .sidebar-section::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: var(--radius-lg);
-    background: linear-gradient(135deg, hsla(250 100% 70% / 0.05), transparent);
-    pointer-events: none;
-  }
-  
-  .sidebar-section:hover {
-    border-color: hsl(var(--border-bright));
-    transform: translateX(-2px);
-  }
-
-  .sidebar-title {
-    font-size: 0.95rem;
+  .page-title {
+    font-size: 2rem;
     font-weight: 800;
-    margin-bottom: 1rem;
     color: hsl(var(--foreground));
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    margin: 0;
+    letter-spacing: -0.02em;
   }
 
-  .sidebar-text {
-    font-size: 0.875rem;
-    color: hsl(var(--muted-foreground));
-    line-height: 1.5;
-  }
-
-  .sidebar-text.small {
-    font-size: 0.75rem;
-    text-align: center;
-  }
-
-  .category-pills {
+  .header-dropdowns {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    gap: 1rem;
+    align-items: center;
   }
 
-  .category-pill {
-    padding: 0.75rem 1.25rem;
-    background: hsl(var(--background));
+  .dropdown-wrapper {
+    position: relative;
+  }
+
+  .header-dropdown-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: transparent;
     border: 1px solid hsl(var(--border));
-    border-radius: var(--radius-full);
-    font-size: 0.875rem;
-    font-weight: 600;
+    border-radius: 4px;
+    color: hsl(var(--foreground));
+    font-size: 0.9375rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .header-dropdown-trigger:hover {
+    background: hsl(var(--muted));
+    border-color: hsl(var(--primary));
+  }
+
+  .dropdown-icon {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.2s ease;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .dropdown-icon.open {
+    transform: rotate(180deg);
+  }
+
+  .header-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    min-width: 180px;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 4px;
+    box-shadow: 0 8px 24px hsla(0 0% 0% / 0.4);
+    z-index: 100;
+    overflow: hidden;
+    animation: slideDown 0.2s ease;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .header-dropdown-item {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: transparent;
+    border: none;
+    font-size: 0.9375rem;
+    font-weight: 500;
     color: hsl(var(--foreground));
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     text-align: left;
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .category-pill::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: var(--gradient-primary);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-  
-  .category-pill span {
-    position: relative;
-    z-index: 1;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid hsl(var(--border));
   }
 
-  .category-pill:hover {
+  .header-dropdown-item:last-child {
+    border-bottom: none;
+  }
+
+  .header-dropdown-item:hover {
     background: hsl(var(--muted));
-    transform: translateX(4px);
-    border-color: hsl(var(--border-bright));
+    color: hsl(var(--primary));
   }
 
-  .category-pill.active {
-    background: var(--gradient-primary);
-    color: white;
-    border-color: hsl(var(--primary));
-    box-shadow: 
-      0 4px 12px hsla(250 100% 70% / 0.3),
-      inset 0 1px 0 hsla(255 255 255 / 0.2);
-  }
-  
-  .category-pill.active::before {
-    opacity: 1;
+  .header-dropdown-item.active {
+    background: hsl(var(--primary) / 0.1);
+    color: hsl(var(--primary));
+    font-weight: 700;
   }
 
-  .login-buttons {
+  .header-right {
     display: flex;
-    gap: 0.75rem;
-    margin-top: 1rem;
+    align-items: center;
+    gap: 1rem;
   }
 
-  .social-btn {
-    flex: 1;
-    padding: 0.875rem;
+  .view-toggle {
+    display: flex;
+    gap: 0.5rem;
+    background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
-    border-radius: var(--radius-md);
-    background: hsl(var(--background));
+    border-radius: 4px;
+    padding: 0.25rem;
+  }
+
+  .view-toggle-btn {
+    padding: 0.5rem;
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    color: hsl(var(--muted-foreground));
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .social-btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at center, hsla(255 255 255 / 0.2), transparent);
-    opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: all 0.2s ease;
   }
 
-  .social-btn:hover {
-    transform: translateY(-4px) scale(1.05);
-    box-shadow: 
-      0 8px 24px rgba(0, 0, 0, 0.2),
-      0 0 0 1px hsla(255 255 255 / 0.1);
-  }
-  
-  .social-btn:hover::before {
-    opacity: 1;
+  .view-toggle-btn:hover {
+    background: hsl(var(--muted));
+    color: hsl(var(--foreground));
   }
 
-  .social-btn.kakao {
-    background: linear-gradient(135deg, #fee500, #fdd500);
-    border-color: #fdd500;
-  }
-  
-  .social-btn.kakao:hover {
-    box-shadow: 
-      0 8px 24px rgba(254, 229, 0, 0.3),
-      0 0 0 1px #fee500;
-  }
-
-  .social-btn.google {
-    background: linear-gradient(135deg, #ffffff, #f5f5f5);
-    border-color: #e0e0e0;
-  }
-  
-  .social-btn.google:hover {
-    box-shadow: 
-      0 8px 24px rgba(0, 0, 0, 0.15),
-      0 0 0 1px rgba(0, 0, 0, 0.1);
+  .view-toggle-btn.active {
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
   }
 
   .content-area {
     min-height: 80vh;
+    padding: 2rem 0;
   }
 
-  .cards-grid {
+  .netflix-content {
+    padding: 0 4%;
+  }
+
+  .netflix-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 1.5rem;
+    padding: 1rem 0;
   }
 
-  .story-card {
-    position: relative;
-    background: hsl(var(--card));
-    border: 1px solid hsl(var(--border));
-    border-radius: var(--radius-xl);
-    overflow: hidden;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  .netflix-grid.list-view {
+    grid-template-columns: 1fr;
+  }
+
+  .netflix-card {
     cursor: pointer;
-    animation: fadeIn 0.6s ease-out backwards;
-  }
-  
-  .story-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: var(--radius-xl);
-    padding: 1px;
-    background: var(--gradient-border);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    opacity: 0;
-    transition: opacity 0.4s ease;
+    transition: transform 0.2s ease;
+    position: relative;
   }
 
-  .story-card:hover {
-    transform: translateY(-8px) scale(1.02);
-    box-shadow: 
-      0 20px 40px rgba(0, 0, 0, 0.3),
-      0 0 0 1px hsla(250 100% 70% / 0.2),
-      inset 0 1px 0 hsla(255 255 255 / 0.1);
+  .netflix-card:hover {
+    transform: translateY(-4px);
   }
-  
-  .story-card:hover::before {
-    opacity: 1;
-  }
-  
-  .story-card:nth-child(2) { animation-delay: 0.1s; }
-  .story-card:nth-child(3) { animation-delay: 0.2s; }
-  .story-card:nth-child(4) { animation-delay: 0.3s; }
-  .story-card:nth-child(5) { animation-delay: 0.4s; }
-  .story-card:nth-child(6) { animation-delay: 0.5s; }
 
-  .card-image {
+  .netflix-card-image {
     position: relative;
     width: 100%;
-    height: 200px;
+    aspect-ratio: 2 / 3;
     overflow: hidden;
-    background: linear-gradient(135deg, hsl(240 12% 15%), hsl(240 12% 10%));
-  }
-  
-  .card-image::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      180deg,
-      transparent 0%,
-      transparent 50%,
-      hsla(240 15% 6% / 0.8) 100%
-    );
-    pointer-events: none;
-  }
-
-  .card-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  .story-card:hover .card-image img {
-    transform: scale(1.1);
-  }
-
-  .card-badge {
-    position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
-    padding: 0.375rem 0.875rem;
-    background: linear-gradient(135deg, hsla(250 100% 70% / 0.9), hsla(280 100% 65% / 0.9));
-    backdrop-filter: blur(12px);
-    color: white;
-    font-size: 0.75rem;
-    font-weight: 700;
-    border-radius: var(--radius-full);
-    box-shadow: 0 4px 12px hsla(250 100% 70% / 0.3);
-    border: 1px solid hsla(255 255 255 / 0.2);
-    z-index: 1;
-  }
-
-  .card-content {
-    padding: 1.5rem;
-    position: relative;
-    background: linear-gradient(
-      180deg,
-      hsla(240 12% 12% / 0.5) 0%,
-      hsla(240 12% 10% / 0.8) 100%
-    );
-  }
-
-  .card-title {
-    font-size: 1.25rem;
-    font-weight: 800;
-    margin-bottom: 0.5rem;
-    color: hsl(var(--foreground));
-    background: linear-gradient(135deg, hsl(0 0% 100%), hsl(0 0% 85%));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -0.02em;
-  }
-
-  .card-author {
-    font-size: 0.875rem;
-    color: hsl(var(--muted-foreground));
+    border-radius: 4px;
+    background: hsl(var(--card));
     margin-bottom: 0.75rem;
   }
 
-  .card-description {
-    font-size: 0.875rem;
-    line-height: 1.5;
-    color: hsl(var(--muted-foreground));
-    margin-bottom: 1rem;
+  .netflix-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+  }
+
+  .netflix-card:hover .netflix-card-image img {
+    transform: scale(1.05);
+  }
+
+  .top10-badge {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    font-size: 0.75rem;
+    font-weight: 800;
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+    z-index: 2;
+  }
+
+  .netflix-card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .netflix-card-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+    line-height: 1.3;
+    margin: 0;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
 
-  .card-meta {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid hsl(var(--border));
-  }
-
-  .meta-item {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    font-size: 0.875rem;
+  .netflix-card-episode {
+    font-size: 0.8125rem;
     color: hsl(var(--muted-foreground));
-    font-weight: 600;
-  }
-
-  .meta-item svg {
-    color: hsl(var(--accent));
-    filter: drop-shadow(0 0 4px hsla(45 100% 65% / 0.3));
+    line-height: 1.4;
+    margin: 0;
   }
 
   .empty-state {
@@ -579,18 +566,52 @@
   }
 
   @media (max-width: 1200px) {
-    .main-content {
-      grid-template-columns: 1fr;
-    }
-
-    .sidebar-left {
-      display: none;
+    .netflix-grid {
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1.25rem;
     }
   }
 
   @media (max-width: 768px) {
-    .cards-grid {
-      grid-template-columns: 1fr;
+    .netflix-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1.5rem 1rem;
+    }
+
+    .header-left {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+      width: 100%;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+    }
+
+    .header-dropdowns {
+      width: 100%;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .dropdown-wrapper {
+      width: 100%;
+    }
+
+    .header-dropdown-trigger {
+      width: 100%;
+    }
+
+    .netflix-content {
+      padding: 0 2%;
+    }
+
+    .netflix-grid {
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 1rem;
     }
   }
 </style>

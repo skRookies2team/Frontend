@@ -528,7 +528,7 @@
     align-items: center;
     justify-content: center;
     padding: 3rem 2rem;
-    background: linear-gradient(135deg, hsla(250 100% 70% / 0.1), hsla(280 100% 65% / 0.05));
+    background: linear-gradient(135deg, hsla(0 90% 48% / 0.1), hsla(0 85% 42% / 0.05));
     border: 2px dashed hsl(var(--border));
     border-radius: var(--radius-lg);
     text-align: center;

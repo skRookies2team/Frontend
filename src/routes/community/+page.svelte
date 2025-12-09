@@ -895,9 +895,9 @@
   }
 
   .community-container {
-    max-width: 1400px;
+    width: 100%;
     margin: 0 auto;
-    padding: 2rem;
+    padding: 2rem 4%;
   }
 
   .community-header {
@@ -933,7 +933,7 @@
     display: flex;
     gap: 0.5rem;
     margin-bottom: 2rem;
-    border-bottom: 1px solid hsla(250 50% 50% / 0.2);
+    border-bottom: 1px solid hsla(0 70% 45% / 0.2);
     position: relative;
   }
   
@@ -944,7 +944,7 @@
     left: 0;
     width: 100%;
     height: 1px;
-    background: linear-gradient(90deg, transparent, hsla(250 50% 50% / 0.3), transparent);
+    background: linear-gradient(90deg, transparent, hsla(0 70% 45% / 0.3), transparent);
   }
 
   .tab {
@@ -970,7 +970,7 @@
     border-bottom-color: transparent;
     background: var(--gradient-primary);
     border-radius: var(--radius-md) var(--radius-md) 0 0;
-    box-shadow: 0 -4px 12px hsla(250 100% 70% / 0.3);
+    box-shadow: 0 -4px 12px hsla(0 90% 48% / 0.3);
   }
 
   /* Content Grid */
@@ -1003,7 +1003,7 @@
     position: absolute;
     inset: 0;
     border-radius: var(--radius-lg);
-    background: linear-gradient(135deg, hsla(250 100% 70% / 0.05), transparent);
+    background: linear-gradient(135deg, hsla(0 90% 48% / 0.05), transparent);
     opacity: 0;
     transition: opacity 0.3s ease;
   }
@@ -1011,7 +1011,7 @@
   .post-card:hover {
     box-shadow: 
       0 12px 32px rgba(0, 0, 0, 0.3),
-      0 0 0 1px hsla(250 100% 70% / 0.2);
+      0 0 0 1px hsla(0 90% 48% / 0.2);
     transform: translateY(-4px);
     border-color: hsl(var(--border-bright));
   }
@@ -1109,7 +1109,7 @@
 
   .action-btn:hover {
     color: hsl(var(--primary));
-    background: hsla(250 100% 70% / 0.1);
+    background: hsla(0 90% 48% / 0.1);
     border-color: hsl(var(--border-bright));
     transform: translateY(-2px);
   }
@@ -1118,13 +1118,13 @@
     color: hsl(0 0% 100%);
     background: var(--gradient-primary);
     border-color: hsl(var(--primary));
-    box-shadow: 0 4px 12px hsla(250 100% 70% / 0.3);
+    box-shadow: 0 4px 12px hsla(0 90% 48% / 0.3);
   }
 
   .post-type {
     padding: 0.375rem 1rem;
-    background: linear-gradient(135deg, hsla(250 100% 70% / 0.2), hsla(280 100% 65% / 0.15));
-    border: 1px solid hsla(250 50% 50% / 0.3);
+    background: linear-gradient(135deg, hsla(0 90% 48% / 0.2), hsla(0 85% 42% / 0.15));
+    border: 1px solid hsla(0 70% 45% / 0.3);
     border-radius: var(--radius-full);
     font-size: 0.75rem;
     font-weight: 700;
@@ -1163,7 +1163,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at center, hsla(250 100% 70% / 0.05), transparent 70%);
+    background: radial-gradient(circle at center, hsla(0 90% 48% / 0.05), transparent 70%);
     animation: pulse-bg 2s ease-in-out infinite;
   }
 
@@ -1206,7 +1206,7 @@
     position: absolute;
     inset: 0;
     border-radius: var(--radius-lg);
-    background: linear-gradient(135deg, hsla(250 100% 70% / 0.05), transparent);
+    background: linear-gradient(135deg, hsla(0 90% 48% / 0.05), transparent);
     pointer-events: none;
   }
   
@@ -1265,7 +1265,7 @@
     background: var(--gradient-primary);
     color: white;
     border-color: hsl(var(--primary));
-    box-shadow: 0 4px 12px hsla(250 100% 70% / 0.3);
+    box-shadow: 0 4px 12px hsla(0 90% 48% / 0.3);
     transform: translateY(-2px);
   }
   
@@ -1354,7 +1354,7 @@
     max-height: 90vh;
     box-shadow: 
       0 24px 64px hsla(0 0% 0% / 0.5),
-      0 0 0 1px hsla(250 100% 70% / 0.2),
+      0 0 0 1px hsla(0 90% 48% / 0.2),
       inset 0 1px 0 hsla(255 255 255 / 0.1);
     animation: fadeIn 0.4s ease-out, float 0.4s ease-out;
     overflow-y: auto;
@@ -1368,8 +1368,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 2rem;
-    border-bottom: 1px solid hsla(250 50% 50% / 0.2);
-    background: linear-gradient(135deg, hsla(250 100% 70% / 0.05), transparent);
+    border-bottom: 1px solid hsla(0 70% 45% / 0.2);
+    background: linear-gradient(135deg, hsla(0 90% 48% / 0.05), transparent);
   }
 
   .modal-title {
@@ -1396,7 +1396,7 @@
 
   .modal-close:hover {
     color: hsl(var(--foreground));
-    background: hsla(250 100% 70% / 0.1);
+    background: hsla(0 90% 48% / 0.1);
     border-color: hsl(var(--border-bright));
     transform: scale(1.1);
   }
@@ -1527,7 +1527,7 @@
   }
 
   .toolbar-btn:hover {
-    background: hsla(250 100% 70% / 0.15);
+    background: hsla(0 90% 48% / 0.15);
     border-color: hsl(var(--border-bright));
     transform: translateY(-1px);
   }
@@ -1536,7 +1536,7 @@
     background: var(--gradient-primary);
     color: white;
     border-color: hsl(var(--primary));
-    box-shadow: 0 2px 8px hsla(250 100% 70% / 0.3);
+    box-shadow: 0 2px 8px hsla(0 90% 48% / 0.3);
   }
 
   .toolbar-btn:disabled {
@@ -1618,7 +1618,7 @@
   .editor-content:focus {
     outline: none;
     border-color: hsl(var(--primary));
-    box-shadow: 0 0 0 3px hsla(250 100% 70% / 0.1);
+    box-shadow: 0 0 0 3px hsla(0 90% 48% / 0.1);
     background: hsla(240 15% 10% / 0.9);
   }
 
@@ -1672,10 +1672,10 @@
   .upload-progress-container {
     margin-top: 1rem;
     padding: 1.5rem;
-    background: linear-gradient(135deg, hsla(250 100% 70% / 0.1), hsla(280 100% 65% / 0.05));
+    background: linear-gradient(135deg, hsla(0 90% 48% / 0.1), hsla(0 85% 42% / 0.05));
     border: 1px solid hsl(var(--border-bright));
     border-radius: var(--radius-lg);
-    box-shadow: 0 4px 16px hsla(250 100% 70% / 0.2);
+    box-shadow: 0 4px 16px hsla(0 90% 48% / 0.2);
   }
 
   .upload-status {
@@ -1687,7 +1687,7 @@
   .upload-icon {
     font-size: 2.5rem;
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    filter: drop-shadow(0 0 8px hsla(250 100% 70% / 0.5));
+    filter: drop-shadow(0 0 8px hsla(0 90% 48% / 0.5));
   }
 
   @keyframes pulse {
@@ -1724,7 +1724,7 @@
     background: var(--gradient-primary);
     border-radius: var(--radius-full);
     transition: width 0.3s ease;
-    box-shadow: 0 0 12px hsla(250 100% 70% / 0.4);
+    box-shadow: 0 0 12px hsla(0 90% 48% / 0.4);
   }
 
   .upload-percentage {
@@ -1743,8 +1743,8 @@
     justify-content: flex-end;
     gap: 1rem;
     padding: 2rem;
-    border-top: 1px solid hsla(250 50% 50% / 0.2);
-    background: linear-gradient(180deg, transparent, hsla(250 100% 70% / 0.02));
+    border-top: 1px solid hsla(0 70% 45% / 0.2);
+    background: linear-gradient(180deg, transparent, hsla(0 90% 48% / 0.02));
   }
 
 
@@ -1759,6 +1759,10 @@
   }
 
   @media (max-width: 768px) {
+    .community-container {
+      padding: 1.5rem 2%;
+    }
+
     .page-title {
       font-size: 2rem;
     }
