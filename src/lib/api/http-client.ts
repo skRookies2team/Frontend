@@ -4,10 +4,19 @@
  */
 
 import { appConfig } from '$lib/config/app-config';
+import { getAccessToken as getTokenFromStore } from '$lib/stores/auth';
+import { getCookie } from '$lib/utils/cookies';
 
 // 메인 백엔드 URL (인증, 스토리 관리, 커뮤니티 등)
+// 환경변수 PUBLIC_API_BASE_URL에서 가져옴
+// 개발: http://localhost:8080
+// 프로덕션: https://api.yourdomain.com (환경변수에 설정)
 const API_BASE_URL = appConfig.backend.baseUrl;
+
 // 릴레이 서버 URL (AI 기능: 분석, 생성, 이미지, 채팅)
+// 환경변수 PUBLIC_RELAY_API_URL에서 가져옴
+// 개발: http://localhost:8081
+// 프로덕션: https://relay.yourdomain.com (환경변수에 설정)
 const RELAY_API_URL = appConfig.backend.relayUrl;
 
 export class ApiError extends Error {
@@ -34,19 +43,41 @@ class HttpClient {
   }
 
   /**
-   * Get access token from storage
+   * Get access token from store or cookies
    */
   private getAccessToken(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem('accessToken');
+    
+    // Try to get from store first
+    const tokenFromStore = getTokenFromStore();
+    if (tokenFromStore) return tokenFromStore;
+    
+    // Fallback to cookie
+    return getCookie('accessToken');
   }
 
   /**
    * Build URL with query parameters
+   * 
+   * 도메인 정보는 환경변수(PUBLIC_API_BASE_URL 또는 PUBLIC_RELAY_API_URL)에서 가져오고,
+   * path는 상대 경로만 전달하면 됩니다.
+   * 
+   * 예시:
+   * - baseUrl: 'http://localhost:8080' (환경변수에서)
+   * - path: '/api/posts/1/comments' (코드에서)
+   * - 결과: 'http://localhost:8080/api/posts/1/comments'
+   * 
+   * 프로덕션에서는:
+   * - baseUrl: 'https://api.yourdomain.com' (환경변수에서)
+   * - path: '/api/posts/1/comments' (동일한 코드)
+   * - 결과: 'https://api.yourdomain.com/api/posts/1/comments'
    */
   private buildUrl(path: string, params?: Record<string, any>): string {
+    // new URL(상대경로, baseUrl)을 사용하여 절대 URL 생성
+    // baseUrl은 환경변수에서 가져온 값 (http://localhost:8080 또는 https://api.yourdomain.com)
     const url = new URL(path, this.baseUrl);
     
+    // 쿼리 파라미터 추가 (선택사항)
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
@@ -87,6 +118,11 @@ class HttpClient {
     }
 
     try {
+      // 디버깅: 요청 URL 로그 (개발 환경에서만)
+      if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+        console.log(`[API Request] ${init.method || 'GET'} ${url}`);
+      }
+      
       const response = await fetch(url, {
         ...init,
         headers: requestHeaders,
@@ -115,6 +151,13 @@ class HttpClient {
           errorData = 'Unknown error';
         }
         
+        // 디버깅: 에러 정보 로그
+        console.error(`[API Error] ${response.status} ${response.statusText}`, {
+          url,
+          errorData,
+          headers: Object.fromEntries(response.headers.entries())
+        });
+        
         throw new ApiError(response.status, response.statusText, errorData);
       }
 
@@ -130,7 +173,15 @@ class HttpClient {
       if (error instanceof ApiError) {
         throw error;
       }
-      throw new Error(`Network error: ${error}`);
+      
+      // 네트워크 에러 또는 기타 에러 처리
+      console.error('[API Network Error]', {
+        url,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      throw new Error(`Network error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

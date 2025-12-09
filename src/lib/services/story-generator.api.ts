@@ -4,7 +4,7 @@
  */
 
 import type { GameState, SceneData, Choice } from "$lib/types/game-state"
-import type { IStoryGeneratorAPI } from "$lib/api/types"
+import type { IStoryGeneratorAPI } from "$lib/api/types/service-types"
 import { createLLMClient } from "$lib/api/llm-client"
 import { APIImageGenerator } from "./image-generator.api"
 

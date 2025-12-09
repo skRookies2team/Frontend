@@ -4,7 +4,7 @@
  */
 
 import { httpClient } from './http-client';
-import type { PresignedUrlResponseDto } from './backend-types';
+import type { PresignedUrlResponseDto } from './types/backend-types';
 
 export class UploadApi {
   /**

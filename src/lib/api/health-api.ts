@@ -3,8 +3,8 @@
  */
 
 import { httpClient, relayHttpClient } from './http-client';
-import type { HealthCheckResponse } from './backend-types';
-import type { AIHealthResponse } from './ai-api';
+import type { HealthCheckResponse } from './types/backend-types';
+import type { AIHealthResponse } from './types/ai-types';
 
 export class HealthApi {
   /**

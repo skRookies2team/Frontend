@@ -1,16 +1,24 @@
 /**
  * Image Generation API Client
- * Handles communication with image generation providers
+ * 외부 이미지 생성 제공자와 직접 통신하는 클라이언트 (폴백/개발용)
+ * 
+ * 프로덕션 환경에서는 Backend-Relay 서버(ai-api.ts)를 통해 이미지를 생성합니다.
+ * 이 클라이언트는 개발/테스트 또는 Backend-Relay 서버가 사용 불가능할 때 폴백으로 사용됩니다.
+ * 
+ * 지원 제공자:
+ * - OpenAI DALL-E
+ * - Stability AI (준비 중)
+ * - Replicate (준비 중)
  */
 
-import type { ImageGenerationRequest, ImageGenerationResponse } from "./types"
-import { appConfig } from "$lib/config/app-config"
+import type { ExternalImageGenerationRequest, ExternalImageGenerationResponse } from "./types/external-api-types";
+import { appConfig } from "$lib/config/app-config";
 
 /**
  * Base Image Client Interface
  */
 export interface ImageClient {
-  generate(request: ImageGenerationRequest): Promise<ImageGenerationResponse>
+  generate(request: ExternalImageGenerationRequest): Promise<ExternalImageGenerationResponse>;
 }
 
 /**
@@ -25,7 +33,7 @@ export class OpenAIImageClient implements ImageClient {
     this.baseURL = "https://api.openai.com/v1"
   }
 
-  async generate(request: ImageGenerationRequest): Promise<ImageGenerationResponse> {
+  async generate(request: ExternalImageGenerationRequest): Promise<ExternalImageGenerationResponse> {
     const response = await fetch(`${this.baseURL}/images/generations`, {
       method: "POST",
       headers: {
@@ -67,7 +75,7 @@ export class StabilityAIClient implements ImageClient {
     this.baseURL = "https://api.stability.ai/v1"
   }
 
-  async generate(request: ImageGenerationRequest): Promise<ImageGenerationResponse> {
+  async generate(request: ExternalImageGenerationRequest): Promise<ExternalImageGenerationResponse> {
     // Stability AI implementation would go here
     // This is a placeholder
     throw new Error("Stability AI client not yet implemented")
@@ -86,7 +94,7 @@ export class ReplicateClient implements ImageClient {
     this.baseURL = "https://api.replicate.com/v1"
   }
 
-  async generate(request: ImageGenerationRequest): Promise<ImageGenerationResponse> {
+  async generate(request: ExternalImageGenerationRequest): Promise<ExternalImageGenerationResponse> {
     // Replicate implementation would go here
     // This is a placeholder
     throw new Error("Replicate client not yet implemented")

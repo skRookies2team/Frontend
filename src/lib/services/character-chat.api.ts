@@ -4,7 +4,7 @@
  */
 
 import type { Character, GameState } from "$lib/types/game-state"
-import type { ICharacterChatAPI } from "$lib/api/types"
+import type { ICharacterChatAPI } from "$lib/api/types/service-types"
 import { createLLMClient } from "$lib/api/llm-client"
 import { aiApi } from "$lib/api/ai-api"
 import { appConfig } from "$lib/config/app-config"

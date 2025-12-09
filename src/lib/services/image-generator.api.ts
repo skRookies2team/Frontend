@@ -3,7 +3,7 @@
  * Uses Backend-Relay server for AI image generation
  */
 
-import type { IImageGeneratorAPI } from "$lib/api/types"
+import type { IImageGeneratorAPI } from "$lib/api/types/service-types"
 import { createImageClient } from "$lib/api/image-client"
 import { aiApi } from "$lib/api/ai-api"
 import { appConfig } from "$lib/config/app-config"
@@ -31,8 +31,8 @@ export class APIImageGenerator implements IImageGeneratorAPI {
           prompt: this.enhancePrompt(prompt),
           size: "1792x1024",
           quality: "standard",
-        })
-        return response.url
+        });
+        return response.url;
       }
     } catch (error) {
       console.error("[API] Error generating image:", error)
@@ -64,8 +64,8 @@ export class APIImageGenerator implements IImageGeneratorAPI {
           prompt,
           size: "1024x1024",
           quality: "standard",
-        })
-        return response.url
+        });
+        return response.url;
       }
     } catch (error) {
       console.error("[API] Error generating portrait:", error)

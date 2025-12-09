@@ -35,7 +35,6 @@
         });
         
         console.log('로그인 응답:', response);
-        console.log('저장된 토큰:', localStorage.getItem('accessToken'));
         
         alert('로그인 되었습니다!');
 

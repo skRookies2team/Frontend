@@ -21,7 +21,7 @@ import type {
   EpisodeDto,
   UpdateNodeRequestDto,
   RegenerateSubtreeResponseDto,
-} from './backend-types';
+} from './types/backend-types';
 
 export class StoryApi {
   /**

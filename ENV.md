@@ -120,12 +120,29 @@ PUBLIC_STORAGE_TYPE=api
 실제 서버에 배포하는 경우:
 
 ```env
+# ⚠️ 중요: 프로덕션에서는 도메인을 포함한 전체 URL이 필수입니다!
+# http:// 또는 https:// 프로토콜 포함 필수
 PUBLIC_API_BASE_URL=https://api.yourdomain.com
 PUBLIC_RELAY_API_URL=https://relay.yourdomain.com
+# 또는 같은 도메인 사용 시:
+# PUBLIC_API_BASE_URL=https://api.yourdomain.com
+# PUBLIC_RELAY_API_URL=https://api.yourdomain.com
+
 PUBLIC_API_MODE=production
 PUBLIC_IMAGE_API_PROVIDER=backend
 PUBLIC_STORAGE_TYPE=api
 ```
+
+**프로덕션 배포 시 주의사항:**
+
+1. **도메인 포함 필수**: `localhost`가 아닌 실제 도메인을 사용해야 합니다
+   - ✅ 올바른 예: `https://api.yourdomain.com`
+   - ❌ 잘못된 예: `api.yourdomain.com` (프로토콜 누락)
+   - ❌ 잘못된 예: `localhost:8080` (프로덕션에서 사용 불가)
+
+2. **HTTPS 사용 권장**: 프로덕션에서는 보안을 위해 HTTPS를 사용하세요
+
+3. **환경변수 설정 확인**: 배포 플랫폼(Vercel, Netlify, AWS 등)에서 환경변수를 올바르게 설정했는지 확인하세요
 
 ## 주의사항
 
@@ -134,6 +151,18 @@ PUBLIC_STORAGE_TYPE=api
 1. `.env` 파일은 절대 Git에 커밋하지 마세요!
 2. API 키는 외부에 노출되지 않도록 주의하세요
 3. 프로덕션 환경에서는 환경 변수를 서버에서 관리하세요
+
+⚠️ **프로덕션 배포 주의사항**
+
+1. **도메인 URL 필수**: 프로덕션 환경에서는 `PUBLIC_API_BASE_URL`과 `PUBLIC_RELAY_API_URL`에 
+   도메인을 포함한 전체 URL을 반드시 설정해야 합니다
+   - 예: `https://api.yourdomain.com` (프로토콜 포함 필수)
+   - `localhost`는 개발 환경에서만 사용 가능
+
+2. **환경변수 검증**: 환경변수가 올바르게 설정되지 않으면 콘솔에 경고가 표시됩니다
+   - 배포 후 브라우저 콘솔을 확인하여 URL이 올바르게 설정되었는지 확인하세요
+
+3. **CORS 설정**: 백엔드 서버에서 프론트엔드 도메인에 대한 CORS를 허용해야 합니다
 
 ✅ **.gitignore 확인**
 

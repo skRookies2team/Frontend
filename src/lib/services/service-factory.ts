@@ -3,7 +3,7 @@
  * Creates service instances based on configuration (Mock vs API)
  */
 
-import type { IStoryGeneratorAPI, ICharacterChatAPI, IImageGeneratorAPI } from "$lib/api/types"
+import type { IStoryGeneratorAPI, ICharacterChatAPI, IImageGeneratorAPI } from "$lib/api/types/service-types"
 import { isMockMode } from "$lib/config/app-config"
 
 // Mock implementations

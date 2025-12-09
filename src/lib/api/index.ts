@@ -33,7 +33,8 @@ export { httpClient, relayHttpClient, ApiError };
 export type { RequestConfig } from './http-client';
 
 // Export all types
-export * from './backend-types';
+export * from './types';
+export * from './types/backend-types'; // PostType 등 enum export를 위해 추가
 export * from './ai-api';
 
 /**

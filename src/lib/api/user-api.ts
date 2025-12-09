@@ -8,7 +8,7 @@ import type {
   UpdateProfileRequestDto,
   GameHistoryDto,
   AchievementDto
-} from './backend-types';
+} from './types/backend-types';
 
 export class UserApi {
   /**

@@ -8,7 +8,7 @@ import type {
   CreateReviewRequestDto,
   PageReviewResponseDto,
   Pageable
-} from './backend-types';
+} from './types/backend-types';
 
 export class ReviewApi {
   /**

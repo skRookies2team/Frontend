@@ -10,7 +10,7 @@ import type {
   StoryData,
   GenerateStoryRequestDto,
   HealthCheckResponse
-} from './backend-types';
+} from './types/backend-types';
 
 export class GameApi {
   /**

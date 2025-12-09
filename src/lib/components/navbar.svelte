@@ -2,27 +2,9 @@
   import { Button } from '$lib/components/ui/button';
   import { page } from '$app/stores';
   import { api } from '$lib/api';
-  import { onMount } from 'svelte';
+  import { isAuthenticated, user } from '$lib/stores/auth';
   
   let searchQuery = $state('');
-  let isLoggedIn = $state(false);
-  let username = $state('');
-  
-  // 로그인 상태 확인
-  function checkAuth() {
-    isLoggedIn = api.auth.isAuthenticated();
-    if (isLoggedIn) {
-      username = api.auth.getCurrentUsername() || '사용자';
-    }
-  }
-  
-  onMount(() => {
-    checkAuth();
-    
-    // 페이지 변경 시마다 체크
-    const interval = setInterval(checkAuth, 1000);
-    return () => clearInterval(interval);
-  });
   
   async function handleLogout() {
     try {
@@ -30,8 +12,6 @@
       // 추가로 직접 클리어 (확실하게)
       sessionStorage.clear();
       localStorage.removeItem('wizard-state');
-      isLoggedIn = false;
-      username = '';
       window.location.href = '/';
     } catch (error) {
       console.error('로그아웃 실패:', error);
@@ -74,10 +54,10 @@
         </button>
       </div>
       
-      {#if isLoggedIn}
+      {#if $isAuthenticated && $user}
         <!-- 로그인 상태 -->
         <div class="user-info">
-          <span class="username">{username}</span>
+          <span class="username">{$user.username}</span>
         </div>
         <Button variant="outline" size="sm" onclick={handleLogout} aria-label="로그아웃">
           로그아웃

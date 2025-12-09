@@ -8,7 +8,10 @@ import type {
   LoginRequestDto,
   RefreshTokenRequestDto,
   TokenResponseDto
-} from './backend-types';
+} from './types/backend-types';
+import { setCookie, deleteCookie, clearAuthCookies, getCookie } from '$lib/utils/cookies';
+import { authStore } from '$lib/stores/auth';
+import { browser } from '$app/environment';
 
 export class AuthApi {
   /**
@@ -21,12 +24,20 @@ export class AuthApi {
       { requiresAuth: false }
     );
     
-    // Store tokens
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('accessToken', response.accessToken);
-      localStorage.setItem('refreshToken', response.refreshToken);
-      localStorage.setItem('userId', String(response.userId));
-      localStorage.setItem('username', response.username);
+    // Store tokens in cookies and update store
+    if (browser) {
+      setCookie('accessToken', response.accessToken, 7);
+      setCookie('refreshToken', response.refreshToken, 30);
+      setCookie('userId', String(response.userId), 7);
+      setCookie('username', response.username, 7);
+      
+      // Update auth store
+      authStore.setUser({
+        userId: response.userId,
+        username: response.username,
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken
+      });
     }
     
     return response;
@@ -42,12 +53,20 @@ export class AuthApi {
       { requiresAuth: false }
     );
     
-    // Store tokens
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('accessToken', response.accessToken);
-      localStorage.setItem('refreshToken', response.refreshToken);
-      localStorage.setItem('userId', String(response.userId));
-      localStorage.setItem('username', response.username);
+    // Store tokens in cookies and update store
+    if (browser) {
+      setCookie('accessToken', response.accessToken, 7);
+      setCookie('refreshToken', response.refreshToken, 30);
+      setCookie('userId', String(response.userId), 7);
+      setCookie('username', response.username, 7);
+      
+      // Update auth store
+      authStore.setUser({
+        userId: response.userId,
+        username: response.username,
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken
+      });
     }
     
     return response;
@@ -65,12 +84,11 @@ export class AuthApi {
       console.error('Backend logout failed:', error);
       // Continue to clear tokens even if backend call fails
     } finally {
-      // Always clear tokens from localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('userId');
-        localStorage.removeItem('username');
+      // Always clear tokens from cookies and store
+      if (browser) {
+        clearAuthCookies();
+        authStore.clear();
+        
         // 크리에이터 wizard 상태도 초기화 (sessionStorage + localStorage 둘 다)
         sessionStorage.removeItem('wizard-state');
         localStorage.removeItem('wizard-state');
@@ -86,11 +104,11 @@ export class AuthApi {
    * Refresh access token
    */
   async refreshToken(): Promise<TokenResponseDto> {
-    if (typeof window === 'undefined') {
+    if (!browser) {
       throw new Error('Cannot refresh token on server side');
     }
 
-    const refreshToken = localStorage.getItem('refreshToken');
+    const refreshToken = getCookie('refreshToken');
     if (!refreshToken) {
       throw new Error('No refresh token available');
     }
@@ -102,9 +120,11 @@ export class AuthApi {
       { requiresAuth: false }
     );
     
-    // Update tokens
-    localStorage.setItem('accessToken', response.accessToken);
-    localStorage.setItem('refreshToken', response.refreshToken);
+    // Update tokens in cookies and store
+    setCookie('accessToken', response.accessToken, 7);
+    setCookie('refreshToken', response.refreshToken, 30);
+    
+    authStore.updateTokens(response.accessToken, response.refreshToken);
     
     return response;
   }
@@ -113,16 +133,33 @@ export class AuthApi {
    * Check if user is authenticated
    */
   isAuthenticated(): boolean {
-    if (typeof window === 'undefined') return false;
-    return !!localStorage.getItem('accessToken');
+    if (!browser) return false;
+    // Check both store and cookie for reliability
+    const token = getCookie('accessToken');
+    if (token) {
+      // If token exists in cookie but not in store, sync it
+      const userId = getCookie('userId');
+      const username = getCookie('username');
+      const refreshToken = getCookie('refreshToken');
+      if (userId && username) {
+        authStore.setUser({
+          userId: parseInt(userId, 10),
+          username,
+          accessToken: token,
+          refreshToken: refreshToken || null
+        });
+      }
+      return true;
+    }
+    return false;
   }
 
   /**
    * Get current user ID
    */
   getCurrentUserId(): number | null {
-    if (typeof window === 'undefined') return null;
-    const userId = localStorage.getItem('userId');
+    if (!browser) return null;
+    const userId = getCookie('userId');
     return userId ? parseInt(userId, 10) : null;
   }
 
@@ -130,8 +167,8 @@ export class AuthApi {
    * Get current username
    */
   getCurrentUsername(): string | null {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem('username');
+    if (!browser) return null;
+    return getCookie('username');
   }
 }
 

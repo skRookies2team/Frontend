@@ -4,7 +4,7 @@
  */
 
 import type { Character, GameState } from "$lib/types/game-state"
-import type { ICharacterChatAPI } from "$lib/api/types"
+import type { ICharacterChatAPI } from "$lib/api/types/service-types"
 import { getCharacterKnowledge } from "$lib/data/mock-knowledge"
 
 export class MockCharacterChat implements ICharacterChatAPI {

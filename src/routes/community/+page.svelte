@@ -57,9 +57,29 @@
       
       posts = response.content;
       totalPages = response.totalPages;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load posts:', err);
-      error = '게시글을 불러오는데 실패했습니다.';
+      
+      // 더 자세한 에러 메시지 표시
+      if (err instanceof Error) {
+        console.error('Error details:', {
+          message: err.message,
+          stack: err.stack,
+          name: err.name
+        });
+      }
+      
+      // ApiError인 경우 더 자세한 정보 표시
+      if (err?.status) {
+        error = `게시글을 불러오는데 실패했습니다. (${err.status}: ${err.statusText || 'Unknown Error'})`;
+        console.error('API Error:', {
+          status: err.status,
+          statusText: err.statusText,
+          data: err.data
+        });
+      } else {
+        error = '게시글을 불러오는데 실패했습니다. 네트워크 연결을 확인해주세요.';
+      }
     } finally {
       loading = false;
     }

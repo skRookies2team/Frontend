@@ -1,10 +1,17 @@
 /**
  * LLM API Client
- * Handles communication with LLM providers (OpenAI, Anthropic, etc.)
+ * 외부 LLM 제공자와 직접 통신하는 클라이언트 (폴백/개발용)
+ * 
+ * 프로덕션 환경에서는 Backend-Relay 서버(ai-api.ts)를 통해 LLM을 사용합니다.
+ * 이 클라이언트는 개발/테스트 또는 Backend-Relay 서버가 사용 불가능할 때 폴백으로 사용됩니다.
+ * 
+ * 지원 제공자:
+ * - OpenAI (GPT-4, GPT-3.5)
+ * - Anthropic (Claude 3)
  */
 
-import type { LLMRequest, LLMResponse } from "./types"
-import { appConfig } from "$lib/config/app-config"
+import type { LLMRequest, LLMResponse } from "./types/external-api-types";
+import { appConfig } from "$lib/config/app-config";
 
 /**
  * Base LLM Client Interface

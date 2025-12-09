@@ -9,7 +9,7 @@ import type {
   PagePostResponseDto,
   Pageable,
   PostType
-} from './backend-types';
+} from './types/backend-types';
 
 export class PostApi {
   /**

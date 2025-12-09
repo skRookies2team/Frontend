@@ -4,7 +4,7 @@
  */
 
 import type { GameState, SceneData, Choice } from "$lib/types/game-state"
-import type { IStoryGeneratorAPI } from "$lib/api/types"
+import type { IStoryGeneratorAPI } from "$lib/api/types/service-types"
 import { getMockScenesByNovel } from "$lib/data/mock-scenes"
 import { MockImageGenerator } from "./image-generator.mock"
 

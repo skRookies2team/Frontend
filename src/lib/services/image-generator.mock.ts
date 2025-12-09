@@ -3,7 +3,7 @@
  * Uses placeholder images for development and testing
  */
 
-import type { IImageGeneratorAPI } from "$lib/api/types"
+import type { IImageGeneratorAPI } from "$lib/api/types/service-types"
 
 export class MockImageGenerator implements IImageGeneratorAPI {
   async generateImage(prompt: string): Promise<string> {
