@@ -71,6 +71,11 @@ export class AuthApi {
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('userId');
         localStorage.removeItem('username');
+        // 크리에이터 wizard 상태도 초기화 (sessionStorage + localStorage 둘 다)
+        sessionStorage.removeItem('wizard-state');
+        localStorage.removeItem('wizard-state');
+        // 혹시 모를 다른 키들도 정리
+        sessionStorage.clear();
       }
     }
     

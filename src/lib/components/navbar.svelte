@@ -27,11 +27,18 @@
   async function handleLogout() {
     try {
       await api.auth.logout();
+      // 추가로 직접 클리어 (확실하게)
+      sessionStorage.clear();
+      localStorage.removeItem('wizard-state');
       isLoggedIn = false;
       username = '';
       window.location.href = '/';
     } catch (error) {
       console.error('로그아웃 실패:', error);
+      // 에러가 나도 스토리지는 클리어
+      sessionStorage.clear();
+      localStorage.removeItem('wizard-state');
+      window.location.href = '/';
     }
   }
   

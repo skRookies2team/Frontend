@@ -68,12 +68,133 @@
   let metadata = $state<any>(null);
   let error = $state('');
   
-  // 인증 확인
+  // 상태 저장/복원 키
+  const STORAGE_KEY = 'wizard-state';
+  
+  // 상태 저장 함수 (sessionStorage 사용 - 탭이 열려있는 동안만 유지)
+  function saveState() {
+    try {
+      const state = {
+        currentStep,
+        storyId,
+        title,
+        description,
+        summary,
+        characters: characters.map(c => ({ ...c })),
+        selectedGaugeIds: [...selectedGaugeIds],
+        endingConfig: { ...endingConfig },
+        numEpisodes,
+        maxDepth,
+        numEpisodeEndings,
+        currentEpisode,
+        totalEpisodesGenerated,
+        actualTotalEpisodes,
+        currentEpisodeTitle,
+        storyDataId,
+        metadata,
+        // 트리 편집 관련 상태 추가
+        treeEditMode,
+        currentEpisodeTree: currentEpisodeTree ? JSON.parse(JSON.stringify(currentEpisodeTree)) : null,
+        proposedGauges: proposedGauges.map(g => ({ ...g }))
+      };
+      // sessionStorage: F5 새로고침 시 유지, 탭/브라우저 닫으면 초기화
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (err) {
+      console.warn('상태 저장 실패:', err);
+    }
+  }
+  
+  // 상태 복원 함수
+  function restoreState() {
+    try {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
+      
+      const state = JSON.parse(saved);
+      if (state.currentStep) currentStep = state.currentStep;
+      if (state.storyId) storyId = state.storyId;
+      if (state.title) title = state.title;
+      if (state.description) description = state.description;
+      if (state.summary) summary = state.summary;
+      if (state.characters) characters = state.characters;
+      if (state.selectedGaugeIds) selectedGaugeIds = state.selectedGaugeIds;
+      if (state.endingConfig) endingConfig = state.endingConfig;
+      if (state.numEpisodes) numEpisodes = state.numEpisodes;
+      if (state.maxDepth) maxDepth = state.maxDepth;
+      if (state.numEpisodeEndings) numEpisodeEndings = state.numEpisodeEndings;
+      if (state.currentEpisode) currentEpisode = state.currentEpisode;
+      if (state.totalEpisodesGenerated) totalEpisodesGenerated = state.totalEpisodesGenerated;
+      if (state.actualTotalEpisodes) actualTotalEpisodes = state.actualTotalEpisodes;
+      if (state.currentEpisodeTitle) currentEpisodeTitle = state.currentEpisodeTitle;
+      if (state.storyDataId) storyDataId = state.storyDataId;
+      if (state.metadata) metadata = state.metadata;
+      // 트리 편집 관련 상태 복원
+      if (state.treeEditMode !== undefined) treeEditMode = state.treeEditMode;
+      if (state.currentEpisodeTree) currentEpisodeTree = state.currentEpisodeTree;
+      if (state.proposedGauges) proposedGauges = state.proposedGauges;
+    } catch (err) {
+      console.warn('상태 복원 실패:', err);
+    }
+  }
+  
+  // 상태 초기화 함수 (로그아웃 시 호출용)
+  function clearWizardState() {
+    sessionStorage.removeItem(STORAGE_KEY);
+  }
+  
+  // 상태 변경 감지 및 저장 - 모든 상태 변수 추적
+  $effect(() => {
+    // 모든 상태를 추적
+    const _ = currentStep;
+    const __ = storyId;
+    const ___ = title;
+    const ____ = description;
+    const _____ = summary;
+    const ______ = characters.length;
+    const _______ = selectedGaugeIds.length;
+    const ________ = numEpisodes;
+    const _________ = maxDepth;
+    const __________ = currentEpisode;
+    const ___________ = storyDataId;
+    // 트리 편집 관련 상태 추적
+    const ____________ = treeEditMode;
+    const _____________ = currentEpisodeTree;
+    const ______________ = proposedGauges.length;
+    
+    // 약간의 지연 후 저장 (성능 최적화)
+    const timeoutId = setTimeout(() => {
+      saveState();
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
+  });
+  
+  // 인증 확인 및 상태 복원
   onMount(() => {
     if (!api.auth.isAuthenticated()) {
       alert('로그인이 필요합니다.');
       goto('/login');
+      return;
     }
+    
+    // 기존 localStorage의 wizard-state 삭제 (마이그레이션)
+    localStorage.removeItem(STORAGE_KEY);
+    
+    // 상태 복원 (sessionStorage에서)
+    restoreState();
+    
+    // 페이지 언로드 시 상태 저장
+    const handleBeforeUnload = () => {
+      saveState();
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // 컴포넌트 언마운트 시에도 저장
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      saveState();
+    };
   });
   
   const steps = [
@@ -2405,8 +2526,7 @@
   /* 트리 편집 레이아웃 */
   .tree-edit-card {
     min-height: 600px;
-    overflow: auto;
-    overflow-x: auto;
+    overflow: visible;
   }
 
   .tree-edit-layout {
@@ -2414,8 +2534,7 @@
     grid-template-columns: 1fr 350px;
     gap: 1.5rem;
     min-height: 500px;
-    overflow: auto;
-    overflow-x: auto;
+    overflow: visible;
     padding-bottom: 0.5rem;
   }
 
@@ -2425,9 +2544,8 @@
     border-radius: var(--radius-md);
     display: flex;
     flex-direction: column;
-    overflow: auto;
+    overflow: visible;
     min-width: 360px;
-    overflow-x: auto;
   }
 
   .panel-header {
@@ -2455,9 +2573,33 @@
 
   .tree-scroll-container {
     flex: 1;
-    overflow: auto;
+    overflow-x: auto !important;
+    overflow-y: auto;
     padding: 1rem;
     max-height: 70vh;
+    min-width: 0;
+    width: 100%;
+    position: relative;
+  }
+  
+  .tree-scroll-container::-webkit-scrollbar {
+    height: 12px;
+    width: 12px;
+  }
+  
+  .tree-scroll-container::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.3);
+    border-radius: 6px;
+  }
+  
+  .tree-scroll-container::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary) / 0.5);
+    border-radius: 6px;
+    border: 2px solid hsl(var(--muted) / 0.3);
+  }
+  
+  .tree-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary));
   }
 
   .editor-panel-container {
