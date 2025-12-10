@@ -1,12 +1,21 @@
 /**
  * Server Hooks
  * Handles authentication and sets user context
+ * 
+ * Note: For static build (CloudFront + S3), this will be skipped
+ * and authentication will be handled client-side
  */
 
 import type { Handle } from '@sveltejs/kit';
+import { building } from '$app/environment';
 
 export const handle: Handle = async ({ event, resolve }) => {
-  // Read authentication tokens from cookies
+  // Static build 시 서버 사이드 인증 건너뛰기
+  if (building) {
+    return await resolve(event);
+  }
+
+  // Preview/Dev 모드에서만 서버 사이드 인증 처리
   const accessToken = event.cookies.get('accessToken');
   const refreshToken = event.cookies.get('refreshToken');
   const userId = event.cookies.get('userId');
