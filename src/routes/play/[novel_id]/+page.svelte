@@ -4,7 +4,6 @@
   import { storyGenerator } from '$lib/services/story-generator';
   import { characterChat } from '$lib/services/character-chat';
   import { saveGameState, loadGameState, clearGameState, hasSavedGame } from '$lib/utils/storage';
-  import GaugeDisplay from '$lib/components/gauge-display.svelte';
   import CharacterPanel from '$lib/components/character-panel.svelte';
   import StoryScene from '$lib/components/story-scene.svelte';
   import EpisodeEnding from '$lib/components/episode-ending.svelte';
@@ -12,7 +11,6 @@
   import EpisodeIntro from '$lib/components/episode-intro.svelte';
   import CharacterDialog from '$lib/components/character-dialog.svelte';
   import GameMenu from '$lib/components/game-menu.svelte';
-  import ProgressIndicator from '$lib/components/progress-indicator.svelte';
   import { Button } from '$lib/components/ui/button';
   import { api, type StoryData } from '$lib/api';
   import type { Character, NovelConfig } from '$lib/types/game-state';
@@ -30,6 +28,7 @@
   let showMenu = $state(false);
   let gameInitialized = $state(false);
   let sessionId = $state<string | null>(null);
+  let chatMessage = $state('');
   
   // 엔딩 상태
   let episodeEnding = $state<EpisodeEndingDto | null>(null);
@@ -367,14 +366,43 @@
     loading = false;
   }
   
-  async function handleCharacterClick(character: Character) {
+  function handleNpcSelect(character: Character) {
+    if (selectedCharacter.character?.id === character.id) {
+      // 같은 NPC를 다시 클릭하면 닫기
+      selectedCharacter = { character: null, response: '' };
+      chatMessage = '';
+    } else {
+      // 다른 NPC 선택
+      selectedCharacter = { character, response: '' };
+      chatMessage = '';
+    }
+  }
+  
+  async function handleSendMessage() {
+    if (!chatMessage.trim() || !selectedCharacter.character || loading) return;
+    
+    const message = chatMessage.trim();
+    chatMessage = '';
     loading = true;
-    const response = await characterChat.getCharacterResponse(
-      character,
-      gsm.currentState
-    );
-    selectedCharacter = { character, response };
-    loading = false;
+    
+    // TODO: 실제 NPC 대화 API 연동 (나중에 구현)
+    // 임시로 응답 표시
+    try {
+      const response = await characterChat.getCharacterResponse(
+        selectedCharacter.character,
+        gsm.currentState,
+        message
+      );
+      selectedCharacter = { 
+        character: selectedCharacter.character, 
+        response: message // 사용자 메시지와 NPC 응답을 모두 저장해야 함 (나중에 수정 필요)
+      };
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      alert('메시지 전송에 실패했습니다.');
+    } finally {
+      loading = false;
+    }
   }
   
   function handleRestart() {
@@ -428,13 +456,6 @@
           
           <div class="header-info">
             <h1 class="game-title">{novelConfig?.title || '게임'}</h1>
-            <p class="game-progress">
-              Chapter {gameState.act} · Scene {gameState.scene}
-            </p>
-          </div>
-          
-          <div class="header-progress">
-            <ProgressIndicator current={gameState.scene} total={20} />
           </div>
           
           <div class="header-actions">
@@ -534,33 +555,22 @@
           {/if}
           
           <aside class="game-sidebar">
-            {#if novelConfig && novelConfig.themeGauges && novelConfig.themeGauges.length > 0}
-              <div class="sidebar-section">
-                <h2 class="sidebar-title">주제 게이지</h2>
-                <div class="gauges-list">
-                  {#each novelConfig.themeGauges as gauge}
-                    <GaugeDisplay 
-                      {gauge} 
-                      value={gameState.themeGauges[gauge.id] || 0} 
-                    />
-                  {/each}
-                </div>
-              </div>
-            {/if}
-            
-            {#if novelConfig && novelConfig.characters && novelConfig.characters.length > 0}
-              <div class="sidebar-section">
-                <h2 class="sidebar-title">캐릭터</h2>
-                <p class="sidebar-hint">
-                  캐릭터를 클릭하여 조언을 구하세요
-                </p>
+            <div class="sidebar-section npc-chat-section">
+              <h2 class="sidebar-title">NPC 대화</h2>
+              <p class="sidebar-hint">
+                NPC를 선택하여 대화하세요
+              </p>
+              
+              <!-- NPC 선택 목록 -->
+              {#if novelConfig && novelConfig.characters && novelConfig.characters.length > 0}
                 <div class="characters-list">
                   {#each novelConfig.characters as character}
                     <button 
                       class="character-btn" 
-                      type="button" 
-                      onclick={() => handleCharacterClick(character)}
-                      aria-label={`${character.name} 클릭`}
+                      type="button"
+                      class:active={selectedCharacter.character?.id === character.id}
+                      onclick={() => handleNpcSelect(character)}
+                      aria-label={`${character.name} 선택`}
                     >
                       <CharacterPanel 
                         {character}
@@ -570,8 +580,111 @@
                     </button>
                   {/each}
                 </div>
+              {:else}
+                <div class="characters-list">
+                  <div class="no-npc-hint">
+                    <p>현재 사용 가능한 NPC가 없습니다</p>
+                  </div>
+                </div>
+              {/if}
+              
+              <!-- 대화 인터페이스 -->
+              <div class="chat-interface">
+                {#if selectedCharacter.character}
+                  <div class="chat-header">
+                    <div class="chat-character-info">
+                      <div class="chat-avatar">
+                        {selectedCharacter.character.name.charAt(0)}
+                      </div>
+                      <div>
+                        <h3 class="chat-character-name">{selectedCharacter.character.name}</h3>
+                        <p class="chat-character-desc">{selectedCharacter.character.description || 'NPC'}</p>
+                      </div>
+                    </div>
+                    <button 
+                      type="button"
+                      class="chat-close-btn"
+                      onclick={() => selectedCharacter = { character: null, response: '' }}
+                      aria-label="대화 닫기"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                {:else}
+                  <div class="chat-header">
+                    <div class="chat-character-info">
+                      <div class="chat-avatar">💬</div>
+                      <div>
+                        <h3 class="chat-character-name">NPC 대화</h3>
+                        <p class="chat-character-desc">NPC를 선택하여 대화를 시작하세요</p>
+                      </div>
+                    </div>
+                  </div>
+                {/if}
+                
+                <!-- 대화 메시지 영역 -->
+                <div class="chat-messages">
+                  {#if selectedCharacter.character}
+                    <div class="chat-message npc-message">
+                      <div class="message-avatar">{selectedCharacter.character.name.charAt(0)}</div>
+                      <div class="message-content">
+                        <p>안녕하세요! 무엇을 도와드릴까요?</p>
+                      </div>
+                    </div>
+                    
+                    <!-- 여기에 대화 히스토리가 표시됩니다 -->
+                    {#if selectedCharacter.response}
+                      <div class="chat-message user-message">
+                        <div class="message-content">
+                          <p>{selectedCharacter.response}</p>
+                        </div>
+                        <div class="message-avatar">나</div>
+                      </div>
+                    {/if}
+                  {:else}
+                    <div class="chat-empty-state-inline">
+                      <div class="empty-icon">💬</div>
+                      <p class="empty-text">NPC를 선택하여 대화를 시작하세요</p>
+                    </div>
+                  {/if}
+                </div>
+                
+                <!-- 메시지 입력 영역 - 항상 표시 -->
+                <div class="chat-input-area">
+                  <div class="chat-input-wrapper">
+                    <textarea
+                      class="chat-input"
+                      placeholder={selectedCharacter.character ? "메시지를 입력하세요..." : "먼저 NPC를 선택하세요"}
+                      rows="2"
+                      bind:value={chatMessage}
+                      disabled={!selectedCharacter.character}
+                      onkeydown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && selectedCharacter.character) {
+                          e.preventDefault();
+                          handleSendMessage();
+                        }
+                      }}
+                    ></textarea>
+                    <button
+                      type="button"
+                      class="chat-send-btn"
+                      onclick={handleSendMessage}
+                      disabled={!chatMessage.trim() || loading || !selectedCharacter.character}
+                      aria-label="메시지 전송"
+                    >
+                      {#if loading}
+                        <div class="spinner-small"></div>
+                      {:else}
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                          <path d="M2 10l16-8-8 16-2-6-6-2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                      {/if}
+                    </button>
+                  </div>
+                  <p class="chat-hint">Enter로 전송, Shift+Enter로 줄바꿈</p>
+                </div>
               </div>
-            {/if}
+            </div>
           </aside>
         </div>
       </div>
@@ -622,7 +735,7 @@
 
   .header-content {
     display: grid;
-    grid-template-columns: auto 1fr 2fr auto;
+    grid-template-columns: auto 1fr auto;
     gap: 2rem;
     align-items: center;
   }
@@ -661,14 +774,6 @@
     letter-spacing: -0.02em;
   }
 
-  .game-progress {
-    font-size: 0.875rem;
-    color: hsl(var(--muted-foreground));
-  }
-
-  .header-progress {
-    justify-self: center;
-  }
 
   .header-actions {
     display: flex;
@@ -816,11 +921,6 @@
     margin-bottom: 1rem;
   }
 
-  .gauges-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
 
   .characters-list {
     display: flex;
@@ -840,6 +940,300 @@
   .character-btn:hover {
     transform: translateX(4px);
   }
+  
+  .character-btn.active {
+    border-color: hsl(var(--primary));
+    background: hsl(var(--primary) / 0.1);
+  }
+
+  /* NPC 대화 인터페이스 */
+  .npc-chat-section {
+    min-height: 600px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chat-interface {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    height: 500px;
+    border: 2px solid hsl(0 0% 30%);
+    border-radius: var(--radius-md);
+    background: hsl(0 0% 8%);
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  }
+
+  .chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid hsl(0 0% 30%);
+    background: hsl(0 0% 12%);
+  }
+
+  .chat-character-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chat-avatar {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: hsl(var(--primary));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  .chat-character-name {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: hsl(0 0% 95%);
+    margin: 0 0 0.25rem 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .chat-character-desc {
+    font-size: 0.75rem;
+    color: hsl(0 0% 70%);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .chat-close-btn {
+    padding: 0.5rem;
+    background: none;
+    border: none;
+    color: hsl(0 0% 70%);
+    cursor: pointer;
+    font-size: 1.25rem;
+    line-height: 1;
+    transition: color 0.2s;
+    flex-shrink: 0;
+  }
+
+  .chat-close-btn:hover {
+    color: hsl(0 0% 95%);
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background: hsl(0 0% 6%);
+  }
+
+  .chat-messages::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .chat-messages::-webkit-scrollbar-track {
+    background: hsl(0 0% 10%);
+  }
+
+  .chat-messages::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 40%);
+    border-radius: 4px;
+  }
+
+  .chat-messages::-webkit-scrollbar-thumb:hover {
+    background: hsl(0 0% 50%);
+  }
+
+  .chat-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    max-width: 85%;
+  }
+
+  .chat-message.npc-message {
+    align-self: flex-start;
+  }
+
+  .chat-message.user-message {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+  }
+
+  .message-avatar {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: hsl(var(--primary));
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+  }
+
+  .user-message .message-avatar {
+    background: hsl(var(--muted));
+    color: hsl(var(--foreground));
+  }
+
+  .message-content {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    background: hsl(0 0% 15%);
+    border: 1px solid hsl(0 0% 25%);
+  }
+
+  .user-message .message-content {
+    background: hsl(0 90% 20%);
+    border-color: hsl(0 90% 35%);
+  }
+
+  .message-content p {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: hsl(0 0% 95%);
+    word-wrap: break-word;
+  }
+
+  .chat-input-area {
+    padding: 1rem;
+    border-top: 1px solid hsl(0 0% 30%);
+    background: hsl(0 0% 10%);
+  }
+
+  .chat-input-wrapper {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+  }
+
+  .chat-input {
+    flex: 1;
+    padding: 0.75rem;
+    background: hsl(0 0% 12%);
+    border: 2px solid hsl(0 0% 30%);
+    border-radius: var(--radius-md);
+    color: hsl(0 0% 95%);
+    font-size: 0.875rem;
+    font-family: inherit;
+    resize: none;
+    min-height: 2.5rem;
+    max-height: 6rem;
+    transition: all 0.2s;
+  }
+
+  .chat-input::placeholder {
+    color: hsl(0 0% 50%);
+  }
+
+  .chat-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: hsl(0 0% 8%);
+  }
+
+  .chat-input:focus:not(:disabled) {
+    outline: none;
+    border-color: hsl(0 90% 50%);
+    box-shadow: 0 0 0 3px hsl(0 90% 50% / 0.2);
+    background: hsl(0 0% 15%);
+  }
+
+  .chat-send-btn {
+    padding: 0.75rem;
+    background: hsl(var(--primary));
+    border: none;
+    border-radius: var(--radius-md);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    min-width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .chat-send-btn:hover:not(:disabled) {
+    background: hsl(var(--primary) / 0.9);
+    transform: scale(1.05);
+  }
+
+  .chat-send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .spinner-small {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
+  .chat-hint {
+    margin: 0.5rem 0 0 0;
+    font-size: 0.75rem;
+    color: hsl(0 0% 60%);
+    text-align: center;
+  }
+
+  .chat-empty-state-inline {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    text-align: center;
+    height: 100%;
+  }
+
+  .empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.6;
+  }
+
+  .empty-text {
+    font-size: 0.875rem;
+    color: hsl(0 0% 65%);
+    margin: 0;
+  }
+
+  .no-npc-hint {
+    padding: 1.5rem;
+    text-align: center;
+    border: 1px dashed hsl(0 0% 30%);
+    border-radius: var(--radius-md);
+    background: hsl(0 0% 10%);
+  }
+
+  .no-npc-hint p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: hsl(0 0% 65%);
+  }
 
   @media (max-width: 1200px) {
     .game-layout {
@@ -852,9 +1246,6 @@
       grid-template-columns: auto 1fr auto;
     }
 
-    .header-progress {
-      display: none;
-    }
   }
 </style>
 

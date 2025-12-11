@@ -1,6 +1,7 @@
 <script lang="ts">
   export let title = '';
   export let description = '';
+  export let genre = '';
   export let uploadedFile: File | null = null;
   export let uploading = false;
   export let uploadProgress = 0;
@@ -8,8 +9,12 @@
   export let error = '';
   export let onTitleChange: (value: string) => void;
   export let onDescriptionChange: (value: string) => void;
+  export let onGenreChange: (value: string) => void;
   export let onFileChange: (event: Event) => void;
   export let onRemoveFile: () => void;
+
+  // 장르 목록
+  const genres = ['고전문학', 'SF', '추리', '판타지', '로맨스', '교육'];
 </script>
 
 <!-- 1단계: 소설 텍스트 입력 -->
@@ -48,6 +53,29 @@
               placeholder="소설에 대한 간단한 설명"
             />
           </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">장르 선택 (선택)</label>
+          <p class="field-hint">소설의 장르를 선택하세요</p>
+          <div class="genre-grid">
+            {#each genres as g}
+              <button
+                type="button"
+                class="genre-button"
+                class:selected={genre === g}
+                onclick={() => onGenreChange(g)}
+                disabled={uploading}
+              >
+                {g}
+              </button>
+            {/each}
+          </div>
+          {#if genre}
+            <p class="genre-selected-hint">
+              선택된 장르: <strong>{genre}</strong>
+            </p>
+          {/if}
         </div>
       </div>
     </div>
@@ -134,4 +162,60 @@
     {/if}
   </div>
 </div>
+
+<style>
+  .genre-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: hsl(var(--muted) / 0.1);
+  }
+
+  .genre-button {
+    padding: 0.75rem 1rem;
+    background: hsl(var(--background));
+    border: 3px solid hsl(0 0% 50%);
+    border-radius: var(--radius-md);
+    color: hsl(var(--foreground));
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+  }
+
+  .genre-button:hover:not(:disabled) {
+    border-color: hsl(var(--primary) / 0.5);
+    background: hsl(var(--muted) / 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px hsl(var(--foreground) / 0.1);
+  }
+
+  .genre-button.selected {
+    background: hsl(var(--primary));
+    border-color: hsl(var(--primary));
+    color: white;
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
+  }
+
+  .genre-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .genre-selected-hint {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .genre-selected-hint strong {
+    color: hsl(var(--primary));
+    font-weight: 700;
+  }
+</style>
 

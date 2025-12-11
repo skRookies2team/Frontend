@@ -11,6 +11,106 @@
   let achievements: AchievementDto[] = $state([]);
   let error = $state('');
   
+  // 목업 업적 데이터 (실제 API가 준비되면 제거)
+  const mockAchievements: AchievementDto[] = [
+    {
+      achievementId: 1,
+      code: 'FIRST_STORY',
+      name: '첫 걸음',
+      description: '첫 번째 스토리를 플레이하세요',
+      type: 'PLAY_COUNT',
+      targetValue: 1,
+      currentValue: 0,
+      iconUrl: '',
+      points: 10,
+      isUnlocked: false
+    },
+    {
+      achievementId: 2,
+      code: 'STORY_MASTER',
+      name: '스토리 마스터',
+      description: '10개의 스토리를 플레이하세요',
+      type: 'PLAY_COUNT',
+      targetValue: 10,
+      currentValue: 0,
+      iconUrl: '',
+      points: 50,
+      isUnlocked: false
+    },
+    {
+      achievementId: 3,
+      code: 'COMPLETIONIST',
+      name: '완벽주의자',
+      description: '5개의 스토리를 완주하세요',
+      type: 'COMPLETION_COUNT',
+      targetValue: 5,
+      currentValue: 0,
+      iconUrl: '',
+      points: 100,
+      isUnlocked: false
+    },
+    {
+      achievementId: 4,
+      code: 'ENDING_COLLECTOR',
+      name: '엔딩 수집가',
+      description: '20개의 엔딩을 달성하세요',
+      type: 'ENDING_COUNT',
+      targetValue: 20,
+      currentValue: 0,
+      iconUrl: '',
+      points: 150,
+      isUnlocked: false
+    },
+    {
+      achievementId: 5,
+      code: 'CREATOR',
+      name: '창작자',
+      description: '첫 번째 스토리를 생성하세요',
+      type: 'CREATION_COUNT',
+      targetValue: 1,
+      currentValue: 0,
+      iconUrl: '',
+      points: 30,
+      isUnlocked: false
+    },
+    {
+      achievementId: 6,
+      code: 'PROLIFIC_CREATOR',
+      name: '다작 작가',
+      description: '5개의 스토리를 생성하세요',
+      type: 'CREATION_COUNT',
+      targetValue: 5,
+      currentValue: 0,
+      iconUrl: '',
+      points: 200,
+      isUnlocked: false
+    },
+    {
+      achievementId: 7,
+      code: 'SOCIAL_BUTTERFLY',
+      name: '사교적',
+      description: '커뮤니티에 10개의 게시글을 작성하세요',
+      type: 'POST_COUNT',
+      targetValue: 10,
+      currentValue: 0,
+      iconUrl: '',
+      points: 80,
+      isUnlocked: false
+    },
+    {
+      achievementId: 8,
+      code: 'PERFECTIONIST',
+      name: '완벽주의',
+      description: '모든 업적을 달성하세요',
+      type: 'ACHIEVEMENT_COUNT',
+      targetValue: 7,
+      currentValue: 0,
+      iconUrl: '',
+      points: 500,
+      isUnlocked: false
+    }
+  ];
+  
   onMount(async () => {
     // Check if user is authenticated
     if (!api.auth.isAuthenticated()) {
@@ -23,28 +123,68 @@
       const [profileData, historyData, achievementsData] = await Promise.all([
         api.user.getMyProfile(),
         api.user.getGameHistory(),
-        api.user.getAchievements()
+        api.user.getAchievements().catch(() => []) // API 실패 시 빈 배열 반환
       ]);
       
       profile = profileData;
       gameHistory = historyData;
-      achievements = achievementsData;
+      
+      // 업적 데이터가 없거나 비어있으면 목업 데이터 사용
+      if (!achievementsData || achievementsData.length === 0) {
+        // 프로필 데이터를 기반으로 현재 진행 상태 업데이트
+        achievements = mockAchievements.map(achievement => {
+          let currentValue = 0;
+          let isUnlocked = false;
+          
+          switch (achievement.type) {
+            case 'PLAY_COUNT':
+              currentValue = profileData?.totalPlayCount || 0;
+              isUnlocked = currentValue >= achievement.targetValue;
+              break;
+            case 'COMPLETION_COUNT':
+              currentValue = profileData?.completedStoryCount || 0;
+              isUnlocked = currentValue >= achievement.targetValue;
+              break;
+            case 'ENDING_COUNT':
+              currentValue = profileData?.unlockedEndingCount || 0;
+              isUnlocked = currentValue >= achievement.targetValue;
+              break;
+            case 'CREATION_COUNT':
+              // TODO: 생성한 스토리 수 (현재 API에 없음)
+              currentValue = 0;
+              isUnlocked = currentValue >= achievement.targetValue;
+              break;
+            case 'POST_COUNT':
+              // TODO: 게시글 수 (현재 API에 없음)
+              currentValue = 0;
+              isUnlocked = currentValue >= achievement.targetValue;
+              break;
+            case 'ACHIEVEMENT_COUNT':
+              currentValue = profileData?.unlockedAchievementCount || 0;
+              isUnlocked = currentValue >= achievement.targetValue;
+              break;
+          }
+          
+          return {
+            ...achievement,
+            currentValue,
+            isUnlocked,
+            unlockedAt: isUnlocked ? new Date().toISOString() : undefined
+          };
+        });
+      } else {
+        achievements = achievementsData;
+      }
     } catch (err) {
       console.error('Failed to load profile:', err);
       error = '프로필을 불러오는데 실패했습니다.';
+      // 에러 발생 시에도 목업 데이터 사용
+      achievements = mockAchievements;
     } finally {
       loading = false;
     }
   });
 
-  async function handleLogout() {
-    try {
-      await api.auth.logout();
-      goto('/login');
-    } catch (err) {
-      console.error('Logout failed:', err);
-    }
-  }
 
   // Mock data for stories (will be replaced with actual API)
   const playedStories = [
@@ -142,10 +282,6 @@
             </div>
           </div>
         </div>
-        <div class="header-actions">
-          <Button variant="outline">설정</Button>
-          <Button variant="outline" onclick={handleLogout}>로그아웃</Button>
-        </div>
       </div>
     </header>
 
@@ -229,24 +365,72 @@
         <div class="stats-section">
           <!-- Achievement Grid -->
           <div class="section-block">
-            <h2 class="section-title">업적</h2>
-            <div class="achievements-grid">
-              {#each achievements as achievement}
-                <div class="achievement-card" class:unlocked={achievement.isUnlocked}>
-                  <div class="achievement-icon">{achievement.iconUrl || '🏆'}</div>
-                  <div class="achievement-info">
-                    <h4 class="achievement-title">{achievement.name}</h4>
-                    <p class="achievement-description">{achievement.description}</p>
-                    <div class="achievement-progress">
-                      {achievement.currentValue} / {achievement.targetValue}
+            <div class="achievements-header">
+              <h2 class="section-title">업적</h2>
+              <div class="achievements-summary">
+                <span class="achievements-count">{profile.unlockedAchievementCount}</span>
+                <span class="achievements-total">/ {achievements.length}</span>
+              </div>
+            </div>
+            {#if achievements.length > 0}
+              <div class="achievements-grid">
+                {#each achievements as achievement}
+                  <div class="achievement-card" class:unlocked={achievement.isUnlocked}>
+                    <div class="achievement-icon-wrapper">
+                      <div class="achievement-icon" class:locked={!achievement.isUnlocked}>
+                        {#if achievement.iconUrl}
+                          <img src={achievement.iconUrl} alt={achievement.name} />
+                        {:else}
+                          <span class="achievement-icon-emoji">🏆</span>
+                        {/if}
+                      </div>
+                      {#if !achievement.isUnlocked}
+                        <div class="lock-overlay">
+                          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                            <path d="M6 10V8C6 5.79086 7.79086 4 10 4H14C16.2091 4 18 5.79086 18 8V10M6 10H4C3.44772 10 3 10.4477 3 11V19C3 19.5523 3.44772 20 4 20H20C20.5523 20 21 19.5523 21 19V11C21 10.4477 20.5523 10 20 10H18M6 10H18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                          </svg>
+                        </div>
+                      {/if}
+                    </div>
+                    <div class="achievement-content">
+                      <h4 class="achievement-title">{achievement.name}</h4>
+                      <p class="achievement-description">{achievement.description}</p>
+                      {#if !achievement.isUnlocked && achievement.targetValue > 1}
+                        <div class="achievement-progress-bar">
+                          <div 
+                            class="progress-fill-bar" 
+                            style="width: {(achievement.currentValue / achievement.targetValue) * 100}%"
+                          ></div>
+                        </div>
+                        <div class="achievement-progress-text">
+                          {achievement.currentValue} / {achievement.targetValue}
+                        </div>
+                      {:else if achievement.isUnlocked && achievement.unlockedAt}
+                        <div class="achievement-unlocked-date">
+                          획득: {new Date(achievement.unlockedAt).toLocaleDateString('ko-KR')}
+                        </div>
+                      {/if}
+                      <div class="achievement-points">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                          <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                          <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        {achievement.points || 0}점
+                      </div>
                     </div>
                   </div>
-                  {#if achievement.isUnlocked}
-                    <div class="unlocked-badge">✓</div>
-                  {/if}
-                </div>
-              {/each}
-            </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="achievements-empty">
+                <div class="empty-icon-large">🏆</div>
+                <h3 class="empty-title">업적이 없습니다</h3>
+                <p class="empty-description">
+                  게임을 플레이하면 업적을 획득할 수 있습니다
+                </p>
+              </div>
+            {/if}
           </div>
 
           <!-- Stats Grid -->
@@ -387,11 +571,6 @@
     color: hsl(var(--primary));
   }
 
-  .header-actions {
-    display: flex;
-    gap: 0.75rem;
-    padding-bottom: 1rem;
-  }
 
   /* Tabs */
   .profile-tabs {
@@ -578,67 +757,257 @@
   .section-title {
     font-size: 1.5rem;
     font-weight: 700;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0;
     color: hsl(var(--foreground));
+  }
+
+  .achievements-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .achievements-summary {
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+
+  .achievements-count {
+    color: hsl(var(--primary));
+    font-size: 1.5rem;
+  }
+
+  .achievements-total {
+    color: hsl(var(--muted-foreground));
   }
 
   .achievements-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
   }
 
   .achievement-card {
     position: relative;
     display: flex;
     gap: 1rem;
-    padding: 1rem;
-    background: hsl(var(--muted));
-    border-radius: var(--radius-md);
-    opacity: 0.5;
-    transition: opacity 0.2s;
+    padding: 1.25rem;
+    background: hsl(0 0% 8%);
+    border: 2px solid hsl(0 0% 20%);
+    border-radius: var(--radius-lg);
+    transition: all 0.3s ease;
+    overflow: hidden;
+  }
+
+  .achievement-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.05), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
   }
 
   .achievement-card.unlocked {
+    background: hsl(0 0% 10%);
+    border-color: hsl(0 90% 40%);
+    box-shadow: 0 4px 12px hsl(0 90% 40% / 0.2);
+  }
+
+  .achievement-card.unlocked::before {
     opacity: 1;
-    background: hsl(var(--primary) / 0.1);
+  }
+
+  .achievement-card.unlocked:hover {
+    border-color: hsl(0 90% 50%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px hsl(0 90% 40% / 0.3);
+  }
+
+  .achievement-icon-wrapper {
+    position: relative;
+    flex-shrink: 0;
+    width: 80px;
+    height: 80px;
   }
 
   .achievement-icon {
-    font-size: 2.5rem;
+    width: 100%;
+    height: 100%;
+    background: hsl(0 0% 15%);
+    border: 2px solid hsl(0 0% 25%);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+
+  .achievement-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .achievement-icon-emoji {
+    font-size: 3rem;
+    filter: grayscale(0);
+    transition: filter 0.3s ease;
+  }
+
+  .achievement-icon.locked {
+    background: hsl(0 0% 6%);
+    border-color: hsl(0 0% 15%);
+    filter: grayscale(1) brightness(0.4);
+  }
+
+  .achievement-icon.locked .achievement-icon-emoji {
+    filter: grayscale(1) brightness(0.3);
+  }
+
+  .achievement-card.unlocked .achievement-icon {
+    background: hsl(0 0% 12%);
+    border-color: hsl(0 90% 40%);
+    box-shadow: 0 0 12px hsl(0 90% 40% / 0.3);
+  }
+
+  .lock-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: hsl(0 0% 0% / 0.6);
+    border-radius: var(--radius-md);
+    color: hsl(0 0% 60%);
+    backdrop-filter: blur(2px);
+  }
+
+  .achievement-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
   }
 
   .achievement-title {
+    font-size: 1rem;
     font-weight: 700;
-    margin-bottom: 0.25rem;
-    color: hsl(var(--foreground));
+    margin: 0;
+    color: hsl(0 0% 95%);
+    line-height: 1.3;
+  }
+
+  .achievement-card.unlocked .achievement-title {
+    color: hsl(0 0% 100%);
   }
 
   .achievement-description {
-    font-size: 0.875rem;
-    color: hsl(var(--muted-foreground));
+    font-size: 0.8125rem;
+    color: hsl(0 0% 70%);
+    margin: 0;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
-  .achievement-progress {
+  .achievement-card.unlocked .achievement-description {
+    color: hsl(0 0% 80%);
+  }
+
+  .achievement-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: hsl(0 0% 15%);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 0.25rem;
+  }
+
+  .achievement-card.unlocked .achievement-progress-bar {
+    background: hsl(0 0% 20%);
+  }
+
+  .progress-fill-bar {
+    height: 100%;
+    background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)));
+    border-radius: 999px;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 8px hsl(var(--primary) / 0.5);
+  }
+
+  .achievement-progress-text {
+    font-size: 0.75rem;
+    color: hsl(0 0% 60%);
+    font-weight: 600;
+    margin-top: 0.125rem;
+  }
+
+  .achievement-unlocked-date {
     font-size: 0.75rem;
     color: hsl(var(--primary));
     font-weight: 600;
     margin-top: 0.25rem;
   }
 
-  .unlocked-badge {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    width: 24px;
-    height: 24px;
-    background: hsl(var(--primary));
-    color: white;
-    border-radius: 50%;
+  .achievement-points {
     display: flex;
     align-items: center;
+    gap: 0.375rem;
+    margin-top: auto;
+    padding-top: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: hsl(0 0% 60%);
+  }
+
+  .achievement-card.unlocked .achievement-points {
+    color: hsl(var(--primary));
+  }
+
+  .achievement-points svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+  }
+
+  .achievements-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
-    font-size: 0.875rem;
+    padding: 4rem 2rem;
+    text-align: center;
+  }
+
+  .empty-icon-large {
+    font-size: 5rem;
+    margin-bottom: 1.5rem;
+    opacity: 0.3;
+    filter: grayscale(0.5);
+  }
+
+  .empty-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+    margin: 0 0 0.75rem 0;
+  }
+
+  .empty-description {
+    font-size: 1rem;
+    color: hsl(var(--muted-foreground));
+    margin: 0;
+    max-width: 400px;
+    line-height: 1.6;
   }
 
   .loading-container,
@@ -692,11 +1061,6 @@
       flex-direction: column;
       align-items: center;
       text-align: center;
-    }
-
-    .header-actions {
-      width: 100%;
-      justify-content: center;
     }
 
     .stories-grid {

@@ -19,6 +19,7 @@
   // 1단계: 소설 텍스트 입력
   let title = $state('');
   let novelText = $state('');
+  let genre = $state('');
   let uploadedFile = $state<File | null>(null);
   let uploadProgress = $state(0);
   let uploading = $state(false);
@@ -79,6 +80,7 @@
         storyId,
         title,
         description,
+        genre,
         summary,
         characters: characters.map(c => ({ ...c })),
         selectedGaugeIds: [...selectedGaugeIds],
@@ -115,6 +117,7 @@
       if (state.storyId) storyId = state.storyId;
       if (state.title) title = state.title;
       if (state.description) description = state.description;
+      if (state.genre) genre = state.genre;
       if (state.summary) summary = state.summary;
       if (state.characters) characters = state.characters;
       if (state.selectedGaugeIds) selectedGaugeIds = state.selectedGaugeIds;
@@ -227,6 +230,10 @@
 
   function setDescriptionValue(value: string) {
     description = value;
+  }
+
+  function setGenreValue(value: string) {
+    genre = value;
   }
 
   function clearUploadedFile() {
@@ -993,6 +1000,7 @@
     uploadedFile = null;
     uploadProgress = 0;
     description = '';
+    genre = '';
     summary = '';
     characters = [];
     proposedGauges = [];
@@ -1080,6 +1088,7 @@
         <Step1Upload
           title={title}
           description={description}
+          genre={genre}
           uploadedFile={uploadedFile}
           uploading={uploading}
           uploadProgress={uploadProgress}
@@ -1087,6 +1096,7 @@
           error={error}
           onTitleChange={setTitleValue}
           onDescriptionChange={setDescriptionValue}
+          onGenreChange={setGenreValue}
           onFileChange={handleFileUpload}
           onRemoveFile={clearUploadedFile}
         />

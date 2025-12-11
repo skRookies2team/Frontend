@@ -315,10 +315,12 @@
     top: calc(100% + 0.5rem);
     left: 0;
     min-width: 180px;
-    background: hsl(var(--card));
+    background: hsl(var(--background));
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
     border: 1px solid hsl(var(--border));
     border-radius: 4px;
-    box-shadow: 0 8px 24px hsla(0 0% 0% / 0.4);
+    box-shadow: 0 8px 24px hsla(0 0% 0% / 0.6);
     z-index: 100;
     overflow: hidden;
     animation: slideDown 0.2s ease;

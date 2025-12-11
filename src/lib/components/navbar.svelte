@@ -269,6 +269,7 @@
     font-size: 0.875rem;
     color: hsl(0 0% 100%);
     text-shadow: 0 0 8px hsla(0 90% 48% / 0.3);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Nanum Gothic', sans-serif;
   }
 
   @media (max-width: 768px) {
