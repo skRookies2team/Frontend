@@ -2371,10 +2371,9 @@
   }
 
   .analysis-layout {
-    display: grid;
-    grid-template-columns: 1.05fr 0.95fr;
+    display: flex;
+    flex-direction: column;
     gap: 2rem;
-    align-items: start;
   }
 
   .summary-section {
@@ -2782,7 +2781,7 @@
     }
 
     .analysis-layout {
-      grid-template-columns: 1fr;
+      flex-direction: column;
     }
 
     .character-list {
