@@ -521,9 +521,6 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 
-  .edit-avatar-btn {
-    margin-top: 0.5rem;
-  }
 
   .profile-info {
     padding-bottom: 1rem;

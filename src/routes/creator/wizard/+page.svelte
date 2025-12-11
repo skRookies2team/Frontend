@@ -1149,11 +1149,9 @@
           endingConfig={endingConfig}
           numEpisodes={numEpisodes}
           maxDepth={maxDepth}
-          numEpisodeEndings={numEpisodeEndings}
           onEndingChange={handleEndingChange}
           onNumEpisodesChange={handleNumEpisodesChange}
           onMaxDepthChange={handleMaxDepthChange}
-          onNumEpisodeEndingsChange={handleNumEpisodeEndingsChange}
         />
 
       {:else if currentStep === 5}

@@ -171,11 +171,6 @@
       padding: 3rem 1.5rem;
     }
 
-    .ai-helper-badge {
-      top: 3rem;
-      right: 1.5rem;
-    }
-
     .hero-title {
       font-size: 2.5rem;
     }

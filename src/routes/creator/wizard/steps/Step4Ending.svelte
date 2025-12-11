@@ -2,11 +2,9 @@
   export let endingConfig = { happy: 2, tragic: 1, neutral: 1, open: 1, bad: 0 };
   export let numEpisodes = 5;
   export let maxDepth = 3;
-  export let numEpisodeEndings = 3;
   export let onEndingChange: (key: string, value: number) => void;
   export let onNumEpisodesChange: (value: number) => void;
   export let onMaxDepthChange: (value: number) => void;
-  export let onNumEpisodeEndingsChange: (value: number) => void;
 </script>
 
 <div class="content-card">

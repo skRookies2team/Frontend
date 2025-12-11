@@ -419,10 +419,6 @@
     color: hsl(var(--primary) / 0.8);
   }
 
-  .submit-btn {
-    margin-top: 0.5rem;
-  }
-
   .divider {
     display: flex;
     align-items: center;

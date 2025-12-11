@@ -34,7 +34,7 @@
   let isStrikethrough = $state(false);
   let textAlign = $state('left');
   
-  let contentEditableElement: HTMLDivElement;
+  let contentEditableElement = $state<HTMLDivElement | null>(null);
 
   onMount(() => {
     // 로그인 상태 확인
@@ -1091,21 +1091,6 @@
     margin-bottom: 1rem;
   }
 
-  .post-tags {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-    flex-wrap: wrap;
-  }
-
-  .tag {
-    padding: 0.25rem 0.75rem;
-    background: hsl(var(--muted));
-    color: hsl(var(--foreground));
-    border-radius: var(--radius-full);
-    font-size: 0.875rem;
-  }
-
   .post-footer {
     display: flex;
     gap: 1rem;
@@ -1275,11 +1260,6 @@
     opacity: 0;
     transition: opacity 0.3s ease;
   }
-  
-  .tag-btn span {
-    position: relative;
-    z-index: 1;
-  }
 
   .tag-btn:hover {
     background: var(--gradient-primary);
@@ -1436,13 +1416,6 @@
     color: hsl(var(--foreground));
   }
 
-  .form-hint {
-    font-size: 0.8rem;
-    color: hsl(var(--muted-foreground));
-    margin-bottom: 0.75rem;
-    line-height: 1.4;
-  }
-
   .form-select,
   .form-input {
     width: 100%;
@@ -1487,23 +1460,9 @@
   }
 
   .form-select:focus,
-  .form-input:focus,
-  .form-textarea:focus {
+  .form-input:focus {
     outline: none;
     border-color: hsl(var(--primary));
-  }
-
-  .form-textarea {
-    width: 100%;
-    padding: 0.75rem;
-    background: hsl(var(--background));
-    border: 1px solid hsl(var(--border));
-    border-radius: var(--radius-md);
-    color: hsl(var(--foreground));
-    font-size: 1rem;
-    resize: vertical;
-    min-height: 200px;
-    font-family: inherit;
   }
 
   /* 리치 에디터 스타일 */
@@ -1667,8 +1626,7 @@
     margin: 1rem 0;
   }
 
-  .editor-content h1, .editor-content h2, .editor-content h3,
-  .editor-content h4, .editor-content h5, .editor-content h6 {
+  .editor-content h1, .editor-content h2, .editor-content h3 {
     margin: 1rem 0 0.5rem;
     font-weight: 700;
   }

@@ -561,11 +561,6 @@
     background-clip: text;
   }
 
-  .card-date {
-    font-size: 0.75rem;
-    color: hsl(var(--muted-foreground));
-    margin-bottom: 0.75rem;
-  }
 
   @media (max-width: 1200px) {
     .netflix-grid {
