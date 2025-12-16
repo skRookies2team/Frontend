@@ -35,7 +35,7 @@ jobs:
 
       - name: Deploy to S3
         run: |
-          aws s3 sync build/ s3://${{ secrets.S3_BUCKET_NAME }} \
+          aws s3 sync build/ s3://${{ secrets.S3_BUCKET_NAME }}/frontend/ \
             --delete \
             --exact-timestamps \
             --cache-control "public, max-age=31536000, immutable" \
@@ -43,7 +43,7 @@ jobs:
             --exclude "*.json"
           
           # HTML과 JSON 파일은 별도로 업로드 (캐시 없음)
-          aws s3 sync build/ s3://${{ secrets.S3_BUCKET_NAME }} \
+          aws s3 sync build/ s3://${{ secrets.S3_BUCKET_NAME }}/frontend/ \
             --delete \
             --exact-timestamps \
             --cache-control "public, max-age=0, must-revalidate" \
@@ -56,7 +56,7 @@ jobs:
           if [ -n "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" ]; then
             aws cloudfront create-invalidation \
               --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
-              --paths "/*" || echo "⚠️ CloudFront invalidation failed (may need additional IAM permissions)"
+              --paths "/frontend/*" || echo "⚠️ CloudFront invalidation failed (may need additional IAM permissions)"
           else
             echo "ℹ️ CLOUDFRONT_DISTRIBUTION_ID not set, skipping cache invalidation"
           fi
@@ -64,6 +64,6 @@ jobs:
       - name: Deployment summary
         run: |
           echo "✅ Deployment completed successfully!"
-          echo "S3 Bucket: ${{ secrets.S3_BUCKET_NAME }}"
+          echo "S3 Bucket: ${{ secrets.S3_BUCKET_NAME }}/frontend/"
           echo "CloudFront Distribution: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}"
 
