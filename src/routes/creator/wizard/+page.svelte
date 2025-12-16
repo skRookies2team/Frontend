@@ -318,6 +318,7 @@
         response = await api.story.uploadNovelFromS3({
           title,
           description,
+          genre,
           fileKey
         });
       } else {

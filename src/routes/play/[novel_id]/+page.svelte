@@ -30,6 +30,10 @@
   let sessionId = $state<string | null>(null);
   let chatMessage = $state('');
   
+  // 즉각 반응 상태
+  let showImmediateReaction = $state(false);
+  let immediateReactionText = $state('');
+  
   // 엔딩 상태
   let episodeEnding = $state<EpisodeEndingDto | null>(null);
   let finalEnding = $state<FinalEndingDto | null>(null);
@@ -145,7 +149,8 @@
           choices: gameStateResponse.choices.map((c, idx) => ({
             id: `choice-${idx}`,
             text: c.text,
-            consequence: ''
+            consequence: '',
+            immediateReaction: c.immediateReaction
           }))
         };
         
@@ -166,7 +171,6 @@
   async function handleChoiceSelect(choiceId: string) {
     if (!gameState.currentScene || !novelConfig) return;
     
-    loading = true;
     const choice = gameState.currentScene.choices.find((c: any) => c.id === choiceId);
     
     if (choice) {
@@ -196,7 +200,8 @@
                 choices: gameStateResponse.choices.map((c, idx) => ({
                   id: `choice-${idx}`,
                   text: c.text,
-                  consequence: ''
+                  consequence: '',
+                  immediateReaction: c.immediateReaction
                 }))
               };
               
@@ -238,6 +243,25 @@
             return;
           }
           
+          // 즉각 반응이 있으면 표시
+          const selectedChoice = gameState.currentScene.choices[choiceIndex];
+          console.log('선택된 선택지:', selectedChoice);
+          console.log('immediateReaction:', (selectedChoice as any)?.immediateReaction);
+          
+          if (selectedChoice && (selectedChoice as any).immediateReaction) {
+            console.log('즉각 반응 표시:', (selectedChoice as any).immediateReaction);
+            immediateReactionText = (selectedChoice as any).immediateReaction;
+            showImmediateReaction = true;
+            
+            // 2초 동안 표시 후 자동으로 사라짐
+            setTimeout(() => {
+              showImmediateReaction = false;
+            }, 2000);
+          } else {
+            console.log('즉각 반응 없음 또는 선택지 없음');
+          }
+          
+          loading = true;
           const gameStateResponse = await api.game.makeChoice(sessionId, choiceIndex);
           
           // 게이지 상태 업데이트
@@ -339,7 +363,8 @@
             choices: gameStateResponse.choices.map((c, idx) => ({
               id: `choice-${idx}`,
               text: c.text,
-              consequence: ''
+              consequence: '',
+              immediateReaction: c.immediateReaction
             }))
           };
           
@@ -515,7 +540,8 @@
                       choices: gameStateResponse.choices.map((c, idx) => ({
                         id: `choice-${idx}`,
                         text: c.text,
-                        consequence: ''
+                        consequence: '',
+                        immediateReaction: c.immediateReaction
                       }))
                     };
                     
@@ -552,6 +578,15 @@
                 showEpisodeIntro = false;
               }}
             />
+          {/if}
+          
+          {#if showImmediateReaction}
+            <div class="immediate-reaction-overlay">
+              <div class="immediate-reaction-card">
+                <div class="reaction-icon">💬</div>
+                <p class="reaction-text">{immediateReactionText}</p>
+              </div>
+            </div>
           {/if}
           
           <aside class="game-sidebar">
@@ -1246,6 +1281,95 @@
       grid-template-columns: auto 1fr auto;
     }
 
+  }
+  
+  /* 즉각 반응 슬라이드 */
+  .immediate-reaction-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    animation: fadeIn 0.3s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .immediate-reaction-card {
+    max-width: 600px;
+    width: 90%;
+    padding: 2.5rem 2rem;
+    background: linear-gradient(135deg, hsl(240 12% 12%), hsl(240 12% 10%));
+    border: 2px solid hsl(var(--primary));
+    border-radius: var(--radius-xl);
+    box-shadow: 
+      0 20px 60px rgba(0, 0, 0, 0.8),
+      0 0 0 1px hsl(var(--primary) / 0.3),
+      inset 0 0 20px hsl(var(--primary) / 0.1);
+    text-align: center;
+    animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .immediate-reaction-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.2), transparent);
+    animation: shimmer 2s infinite;
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  
+  @keyframes shimmer {
+    to { left: 100%; }
+  }
+  
+  .reaction-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    animation: bounce 0.6s ease-out;
+  }
+  
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  
+  .reaction-text {
+    font-size: 1.375rem;
+    font-weight: 600;
+    line-height: 1.6;
+    color: hsl(var(--foreground));
+    margin: 0;
+    background: linear-gradient(135deg, hsl(0 0% 100%), hsl(0 0% 85%));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    position: relative;
+    z-index: 1;
   }
 </style>
 

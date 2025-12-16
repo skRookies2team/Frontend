@@ -85,6 +85,7 @@ export type StoryStatus =
 export interface StoryUploadRequestDto {
   title: string;
   novelText: string;
+  genre?: string;
 }
 
 export interface StoryUploadResponseDto {
@@ -193,6 +194,7 @@ export interface StoryProgressResponseDto {
 export interface MetadataData {
   title: string;
   description?: string;
+  genre?: string;
   totalEpisodes: number;
   totalNodes: number;
   totalGauges: number;
@@ -309,6 +311,7 @@ export interface StoryData {
   id: number;
   title: string;
   description: string;
+  genre?: string;
   storyJson: string;
   totalEpisodes: number;
   totalNodes: number;
@@ -342,6 +345,7 @@ export interface StoryNodeDetailDto {
 export interface StoryChoiceDto {
   text: string;
   tags: string[];
+  immediateReaction?: string;
 }
 
 export interface GaugeDto {
@@ -506,6 +510,7 @@ export interface PresignedUrlResponseDto {
 export interface S3UploadRequestDto {
   title: string;
   description?: string;
+  genre?: string;
   fileKey: string;
 }
 

@@ -49,6 +49,11 @@
   let filteredStories = $derived.by(() => {
     let result = stories;
     
+    // 장르 필터
+    if (selectedCategory !== '전체') {
+      result = result.filter(story => story.genre === selectedCategory);
+    }
+    
     // 검색 필터
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
   import { Button } from '$lib/components/ui/button';
   import type { TreeNode } from './story-tree.svelte';
   
@@ -8,22 +7,15 @@
     node = null as TreeNode | null,
     isLoading = false,
     episodeTitle = '',
-    episodeOrder = 1
+    episodeOrder = 1,
+    onapplychanges,
+    oncancel
   } = $props();
   
   // 편집 상태
   let editedText = $state('');
   let editedChoices = $state<Array<{ text: string; tags: string[] }>>([]);
   let hasChanges = $state(false);
-  
-  const dispatch = createEventDispatcher<{
-    applyChanges: { 
-      nodeId: string; 
-      newText: string; 
-      newChoices: Array<{ text: string; tags: string[] }>;
-    };
-    cancel: void;
-  }>();
   
   // 노드가 변경되면 편집 상태 초기화
   $effect(() => {
@@ -62,11 +54,15 @@
   function handleApply() {
     if (!node || !hasChanges) return;
     
-    dispatch('applyChanges', {
-      nodeId: node.id,
-      newText: editedText,
-      newChoices: editedChoices
-    });
+    if (onapplychanges) {
+      onapplychanges(new CustomEvent('applychanges', {
+        detail: {
+          nodeId: node.id,
+          newText: editedText,
+          newChoices: editedChoices
+        }
+      }));
+    }
   }
   
   function handleCancel() {
@@ -75,7 +71,9 @@
       editedChoices = node.choices ? [...node.choices.map(c => ({ ...c }))] : [];
       hasChanges = false;
     }
-    dispatch('cancel');
+    if (oncancel) {
+      oncancel();
+    }
   }
 </script>
 
