@@ -50,11 +50,27 @@ export class OpenAIImageClient implements ImageClient {
     })
 
     if (!response.ok) {
-      const error = await response.json()
+      const text = await response.text();
+      let error;
+      try {
+        error = JSON.parse(text);
+      } catch {
+        throw new Error(`OpenAI Image API Error: ${response.statusText} - ${text.substring(0, 200)}`);
+      }
       throw new Error(`OpenAI Image API Error: ${error.error?.message || response.statusText}`)
     }
 
-    const data = await response.json()
+    const text = await response.text();
+    if (!text || text.trim().length === 0) {
+      throw new Error('OpenAI Image API returned empty response');
+    }
+    
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (parseError) {
+      throw new Error(`OpenAI Image API returned invalid JSON: ${text.substring(0, 200)}`);
+    }
     
     return {
       url: data.data[0].url,

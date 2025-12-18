@@ -49,11 +49,27 @@ export class OpenAIClient implements LLMClient {
     })
 
     if (!response.ok) {
-      const error = await response.json()
+      const text = await response.text();
+      let error;
+      try {
+        error = JSON.parse(text);
+      } catch {
+        throw new Error(`OpenAI API Error: ${response.statusText} - ${text.substring(0, 200)}`);
+      }
       throw new Error(`OpenAI API Error: ${error.error?.message || response.statusText}`)
     }
 
-    const data = await response.json()
+    const text = await response.text();
+    if (!text || text.trim().length === 0) {
+      throw new Error('OpenAI API returned empty response');
+    }
+    
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (parseError) {
+      throw new Error(`OpenAI API returned invalid JSON: ${text.substring(0, 200)}`);
+    }
     
     return {
       content: data.choices[0].message.content,
@@ -101,11 +117,27 @@ export class AnthropicClient implements LLMClient {
     })
 
     if (!response.ok) {
-      const error = await response.json()
+      const text = await response.text();
+      let error;
+      try {
+        error = JSON.parse(text);
+      } catch {
+        throw new Error(`Anthropic API Error: ${response.statusText} - ${text.substring(0, 200)}`);
+      }
       throw new Error(`Anthropic API Error: ${error.error?.message || response.statusText}`)
     }
 
-    const data = await response.json()
+    const text = await response.text();
+    if (!text || text.trim().length === 0) {
+      throw new Error('Anthropic API returned empty response');
+    }
+    
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (parseError) {
+      throw new Error(`Anthropic API returned invalid JSON: ${text.substring(0, 200)}`);
+    }
     
     return {
       content: data.content[0].text,

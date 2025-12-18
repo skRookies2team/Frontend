@@ -161,14 +161,52 @@ class HttpClient {
         throw new ApiError(response.status, response.statusText, errorData);
       }
 
-      // Handle empty responses
+      // Handle successful responses
+      // 응답을 텍스트로 먼저 읽어서 실제로 JSON인지 확인
       const contentType = response.headers.get('content-type');
+      const text = await response.text();
+      
+      // 빈 응답 처리
+      if (!text || text.trim().length === 0) {
+        return null as T;
+      }
+      
+      // HTML 응답인지 확인 (서버가 HTML 에러 페이지를 반환하는 경우)
+      if (text.trim().toLowerCase().startsWith('<!doctype') || 
+          text.trim().toLowerCase().startsWith('<html')) {
+        console.error('[API Error] Server returned HTML instead of JSON', {
+          url,
+          contentType,
+          preview: text.substring(0, 200)
+        });
+        throw new ApiError(
+          response.status,
+          'Server returned HTML instead of JSON. The API endpoint may be incorrect or the server is not running.',
+          text
+        );
+      }
+      
+      // Content-Type이 JSON이 아니면 텍스트로 반환
       if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
         return text as T;
       }
 
-      return await response.json();
+      // JSON 파싱 시도
+      try {
+        return JSON.parse(text) as T;
+      } catch (parseError) {
+        console.error('[API Error] Failed to parse JSON response', {
+          url,
+          contentType,
+          preview: text.substring(0, 200),
+          error: parseError instanceof Error ? parseError.message : String(parseError)
+        });
+        throw new ApiError(
+          response.status,
+          'Invalid JSON response from server',
+          text
+        );
+      }
     } catch (error) {
       if (error instanceof ApiError) {
         throw error;
