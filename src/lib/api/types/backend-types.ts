@@ -120,6 +120,10 @@ export interface StoryGaugesResponseDto {
   gauges: GaugeDto[];
 }
 
+export interface CharacterSelectionRequestDto {
+  characterNames: string[]; // 1-2 characters
+}
+
 export interface GaugeSelectionRequestDto {
   selectedGaugeIds: string[]; // exactly 2
 }

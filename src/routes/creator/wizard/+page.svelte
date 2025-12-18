@@ -28,7 +28,9 @@
   let summary = $state('');
   let characters = $state<CharacterDto[]>([]);
   let expandedCharacters = $state<Set<string>>(new Set());
+  let selectedCharacterNames = $state<string[]>([]);
   let loadingAnalysis = $state(false);
+  let selectingCharacters = $state(false);
   
   // 3단계: 게이지 선택 (5개 → 2개 선택)
   let proposedGauges = $state<GaugeDto[]>([]);
@@ -83,6 +85,7 @@
         genre,
         summary,
         characters: characters.map(c => ({ ...c })),
+        selectedCharacterNames: [...selectedCharacterNames],
         selectedGaugeIds: [...selectedGaugeIds],
         endingConfig: { ...endingConfig },
         numEpisodes,
@@ -120,6 +123,7 @@
       if (state.genre) genre = state.genre;
       if (state.summary) summary = state.summary;
       if (state.characters) characters = state.characters;
+      if (state.selectedCharacterNames) selectedCharacterNames = state.selectedCharacterNames;
       if (state.selectedGaugeIds) selectedGaugeIds = state.selectedGaugeIds;
       if (state.endingConfig) endingConfig = state.endingConfig;
       if (state.numEpisodes) numEpisodes = state.numEpisodes;
@@ -215,7 +219,7 @@
       case 1: 
         // 파일이 있어야 함
         return uploadedFile !== null && title.length > 0;
-      case 2: return characters.length > 0 && summary.length > 0;
+      case 2: return characters.length > 0 && summary.length > 0 && selectedCharacterNames.length >= 1 && selectedCharacterNames.length <= 2;
       case 3: return selectedGaugeIds.length === 2;
       case 4: return true;
       case 5: case 6: return false; // 자동 진행
@@ -259,6 +263,17 @@
       next.add(name);
     }
     expandedCharacters = next;
+  }
+
+  function toggleCharacterSelection(name: string) {
+    if (selectedCharacterNames.includes(name)) {
+      selectedCharacterNames = selectedCharacterNames.filter(n => n !== name);
+    } else if (selectedCharacterNames.length < 2) {
+      selectedCharacterNames = [...selectedCharacterNames, name];
+    } else {
+      // 이미 2개 선택됨: 첫 번째를 제거하고 새로운 것 추가
+      selectedCharacterNames = [selectedCharacterNames[1], name];
+    }
   }
 
   function truncate(text: string, maxLength = 140) {
@@ -397,10 +412,9 @@
         console.log('1단계: uploadNovel 호출');
         await uploadNovel();
       } else if (currentStep === 2) {
-        console.log('2단계: 게이지 로드');
-        // 2단계 → 3단계: 게이지 로드
-        currentStep = 3;
-        await loadGauges();
+        console.log('2단계: 캐릭터 선택 제출');
+        // 2단계 → 3단계: 캐릭터 선택 제출
+        await submitCharacterSelection();
       } else if (currentStep === 3) {
         console.log('3단계: 게이지 선택 제출');
         // 3단계 → 4단계: 게이지 선택 제출
@@ -419,6 +433,37 @@
     }
   }
   
+  // 2단계: 캐릭터 선택 제출
+  async function submitCharacterSelection() {
+    if (selectedCharacterNames.length < 1 || selectedCharacterNames.length > 2) {
+      alert('NPC로 만들 캐릭터를 1~2명 선택해주세요.');
+      return;
+    }
+    
+    selectingCharacters = true;
+    error = '';
+    
+    try {
+      await api.story.selectCharacters(storyId, {
+        characterNames: selectedCharacterNames
+      });
+      
+      // 3단계로 이동 후 게이지 로드
+      currentStep = 3;
+      await loadGauges();
+    } catch (err: any) {
+      console.error('캐릭터 선택 실패:', err);
+      if (err instanceof ApiError) {
+        error = err.data?.message || '캐릭터 선택에 실패했습니다.';
+      } else {
+        error = '네트워크 오류가 발생했습니다.';
+      }
+      alert('캐릭터 선택 실패: ' + error);
+    } finally {
+      selectingCharacters = false;
+    }
+  }
+
   // 3단계: 게이지 제안 로드
   async function loadGauges() {
     loadingGauges = true;
@@ -1147,32 +1192,51 @@
           loadingAnalysis={loadingAnalysis}
           summary={summary}
           characters={characters}
+          selectedCharacterNames={selectedCharacterNames}
+          selectingCharacters={selectingCharacters}
         >
           {#each characters as character}
-            <button 
-              type="button" 
-              class="character-card"
-              class:expanded={expandedCharacters.has(character.name)}
-              onclick={() => toggleCharacter(character.name)}
-            >
-              <div class="character-avatar">
-                {character.name.charAt(0)}
-              </div>
-              <div class="character-details">
-                <div class="character-name">{character.name}</div>
-                {#if character.aliases && character.aliases.length > 0}
-                  <div class="character-aliases">별칭: {character.aliases.join(', ')}</div>
+            <div class="character-card-wrapper">
+              <button 
+                type="button" 
+                class="character-card"
+                class:expanded={expandedCharacters.has(character.name)}
+                class:selected={selectedCharacterNames.includes(character.name)}
+                onclick={() => toggleCharacter(character.name)}
+                disabled={selectingCharacters}
+              >
+                <div class="character-avatar">
+                  {character.name.charAt(0)}
+                </div>
+                <div class="character-details">
+                  <div class="character-name">{character.name}</div>
+                  {#if character.aliases && character.aliases.length > 0}
+                    <div class="character-aliases">별칭: {character.aliases.join(', ')}</div>
+                  {/if}
+                  <div class="character-description" class:expanded={expandedCharacters.has(character.name)}>
+                    {expandedCharacters.has(character.name) 
+                      ? character.description 
+                      : truncate(character.description, 140)}
+                  </div>
+                  <div class="character-toggle">
+                    {expandedCharacters.has(character.name) ? '접기' : '더보기'}
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                class="character-select-btn"
+                class:selected={selectedCharacterNames.includes(character.name)}
+                onclick={() => toggleCharacterSelection(character.name)}
+                disabled={selectingCharacters}
+              >
+                {#if selectedCharacterNames.includes(character.name)}
+                  ✓ 선택됨
+                {:else}
+                  {selectedCharacterNames.length >= 2 ? '선택 불가' : 'NPC로 선택'}
                 {/if}
-                <div class="character-description" class:expanded={expandedCharacters.has(character.name)}>
-                  {expandedCharacters.has(character.name) 
-                    ? character.description 
-                    : truncate(character.description, 140)}
-                </div>
-                <div class="character-toggle">
-                  {expandedCharacters.has(character.name) ? '접기' : '더보기'}
-                </div>
-              </div>
-            </button>
+              </button>
+            </div>
           {/each}
         </Step2Characters>
 
@@ -2482,6 +2546,12 @@
     margin-top: 1rem;
   }
 
+  .character-card-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
   .character-card {
     display: flex;
     gap: 1rem;
@@ -2493,6 +2563,7 @@
     cursor: pointer;
     text-align: left;
     box-shadow: 0 2px 8px hsl(var(--foreground) / 0.08);
+    width: 100%;
   }
 
   .character-card:hover {
@@ -2505,6 +2576,46 @@
     border-color: hsl(var(--primary));
     box-shadow: 0 6px 16px hsl(var(--primary) / 0.15);
     background: hsl(var(--muted) / 0.15);
+  }
+
+  .character-card.selected {
+    border-color: hsl(142 76% 36%);
+    background: hsl(142 76% 36% / 0.1);
+  }
+
+  .character-card.selected:hover {
+    border-color: hsl(142 76% 36%);
+    background: hsl(142 76% 36% / 0.15);
+  }
+
+  .character-select-btn {
+    padding: 0.625rem 1rem;
+    background: hsl(var(--muted));
+    border: 1.5px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+    color: hsl(var(--foreground));
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+  }
+
+  .character-select-btn:hover:not(:disabled) {
+    background: hsl(var(--primary) / 0.1);
+    border-color: hsl(var(--primary));
+    color: hsl(var(--primary));
+  }
+
+  .character-select-btn.selected {
+    background: hsl(142 76% 36%);
+    border-color: hsl(142 76% 36%);
+    color: white;
+  }
+
+  .character-select-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .character-details {
@@ -2564,6 +2675,21 @@
     color: hsl(var(--primary));
     margin-top: 0.25rem;
     font-weight: 600;
+  }
+
+  .selection-info {
+    padding: 1rem 1.5rem;
+    background: hsl(var(--muted) / 0.1);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+    margin-top: 1rem;
+  }
+
+  .selection-count {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: hsl(var(--muted-foreground));
   }
 
   .selection-count.complete {

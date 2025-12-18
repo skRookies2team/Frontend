@@ -11,6 +11,7 @@ import type {
   StoryCharactersResponseDto,
   StorySummaryResponseDto,
   StoryGaugesResponseDto,
+  CharacterSelectionRequestDto,
   GaugeSelectionRequestDto,
   GaugeSelectionResponseDto,
   StoryConfigRequestDto,
@@ -54,6 +55,16 @@ export class StoryApi {
    */
   async getCharacters(storyId: string): Promise<StoryCharactersResponseDto> {
     return httpClient.get<StoryCharactersResponseDto>(`/api/stories/${storyId}/characters`);
+  }
+
+  /**
+   * 2단계: NPC 챗봇용 캐릭터 선택 (1-2명)
+   */
+  async selectCharacters(
+    storyId: string,
+    data: CharacterSelectionRequestDto
+  ): Promise<void> {
+    return httpClient.post<void>(`/api/stories/${storyId}/select-characters`, data);
   }
 
   /**
