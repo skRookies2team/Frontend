@@ -756,16 +756,22 @@
     nodeId: string; 
     newText: string; 
     newChoices: Array<{ text: string; tags: string[] }>;
+    newImagePrompt?: string;
   }>) {
     if (!selectedNode || !currentEpisodeTree) return;
     
-    const { nodeId, newText, newChoices } = event.detail;
+    const { nodeId, newText, newChoices, newImagePrompt } = event.detail;
     
     regenerating = true;
     error = '';
     
     try {
-      console.log('서브트리 재생성 요청:', { nodeId, newText });
+      console.log('서브트리 재생성 요청:', { nodeId, newText, newImagePrompt });
+      
+      // 이미지 프롬프트 업데이트 (트리에 직접 반영)
+      if (newImagePrompt !== undefined) {
+        updateNodeImagePrompt(nodeId, newImagePrompt);
+      }
       
       // 백엔드 API를 통한 서브트리 재생성 (동기 방식)
       const response = await api.story.regenerateSubtree(
@@ -786,6 +792,11 @@
       // 트리 업데이트 (재생성된 노드들로 교체)
       updateTreeWithRegeneratedNodes(nodeId, response.regeneratedNodes);
       
+      // 재생성 후 이미지 프롬프트 다시 설정 (재생성으로 노드가 교체될 수 있음)
+      if (newImagePrompt !== undefined) {
+        updateNodeImagePrompt(nodeId, newImagePrompt);
+      }
+      
       selectedNode = null;
       alert(`✅ 서브트리 재생성 완료! ${response.totalNodesRegenerated}개 노드가 업데이트되었습니다.`);
       
@@ -799,6 +810,33 @@
       alert('❌ 서브트리 재생성 실패: ' + error);
     } finally {
       regenerating = false;
+    }
+  }
+  
+  // 노드의 이미지 프롬프트 업데이트 (트리 내부)
+  function updateNodeImagePrompt(nodeId: string, imagePrompt: string) {
+    if (!currentEpisodeTree) return;
+    
+    function updateNode(node: TreeNode): boolean {
+      if (node.id === nodeId) {
+        node.imagePrompt = imagePrompt;
+        return true;
+      }
+      if (node.children) {
+        for (const child of node.children) {
+          if (updateNode(child)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+    
+    updateNode(currentEpisodeTree);
+    
+    // selectedNode도 업데이트
+    if (selectedNode && selectedNode.id === nodeId) {
+      selectedNode.imagePrompt = imagePrompt;
     }
   }
   
@@ -849,7 +887,9 @@
       depth: apiNode.depth ?? 0,
       choices: [],
       children: [],
-      details: {}
+      details: {},
+      imagePrompt: apiNode.imagePrompt || apiNode.image_prompt || undefined,
+      imageUrl: apiNode.imageUrl || apiNode.image_url || undefined
     };
     
     // choices 변환 (StoryChoiceDto -> { text, tags }[])

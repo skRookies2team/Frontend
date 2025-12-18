@@ -13,6 +13,8 @@
       npc_emotions?: Record<string, string>;
       relations_update?: Record<string, string>;
     };
+    imagePrompt?: string; // 이미지 프롬프트 (STEP5에서 사용자가 입력)
+    imageUrl?: string; // 생성된 이미지 URL (향후 사용)
   }
   
   // Props

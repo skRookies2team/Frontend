@@ -15,6 +15,7 @@
   // 편집 상태
   let editedText = $state('');
   let editedChoices = $state<Array<{ text: string; tags: string[] }>>([]);
+  let editedImagePrompt = $state('');
   let hasChanges = $state(false);
   
   // 노드가 변경되면 편집 상태 초기화
@@ -22,6 +23,7 @@
     if (node) {
       editedText = node.text;
       editedChoices = node.choices ? [...node.choices.map(c => ({ ...c }))] : [];
+      editedImagePrompt = node.imagePrompt || '';
       hasChanges = false;
     }
   });
@@ -37,6 +39,12 @@
     checkChanges();
   }
   
+  function handleImagePromptChange(e: Event) {
+    const target = e.target as HTMLTextAreaElement;
+    editedImagePrompt = target.value;
+    checkChanges();
+  }
+  
   function checkChanges() {
     if (!node) {
       hasChanges = false;
@@ -47,8 +55,9 @@
     const choicesChanged = editedChoices.some((choice, i) => 
       node.choices && node.choices[i] && choice.text !== node.choices[i].text
     );
+    const imagePromptChanged = editedImagePrompt !== (node.imagePrompt || '');
     
-    hasChanges = textChanged || choicesChanged;
+    hasChanges = textChanged || choicesChanged || imagePromptChanged;
   }
   
   function handleApply() {
@@ -59,7 +68,8 @@
         detail: {
           nodeId: node.id,
           newText: editedText,
-          newChoices: editedChoices
+          newChoices: editedChoices,
+          newImagePrompt: editedImagePrompt
         }
       }));
     }
@@ -69,6 +79,7 @@
     if (node) {
       editedText = node.text;
       editedChoices = node.choices ? [...node.choices.map(c => ({ ...c }))] : [];
+      editedImagePrompt = node.imagePrompt || '';
       hasChanges = false;
     }
     if (oncancel) {
@@ -129,6 +140,27 @@
           </div>
         </div>
       {/if}
+      
+      <!-- 이미지 프롬프트 편집 -->
+      <div class="form-group">
+        <label class="form-label">
+          🖼️ 이미지 프롬프트
+          <span class="label-hint">소설 분위기에 맞는 이미지를 위한 프롬프트를 입력하세요</span>
+        </label>
+        <textarea
+          class="form-textarea image-prompt-textarea"
+          value={editedImagePrompt}
+          oninput={handleImagePromptChange}
+          disabled={isLoading}
+          rows="3"
+          placeholder="예: 어둡고 신비로운 숲 속 마법사의 탑, 판타지 스타일, 달빛이 비치는 밤..."
+        ></textarea>
+        {#if editedImagePrompt}
+          <p class="form-hint">
+            💡 이 프롬프트는 소설의 전체적인 분위기와 스타일에 맞게 자동으로 조정됩니다.
+          </p>
+        {/if}
+      </div>
       
       <!-- 노드 상세 정보 (읽기 전용) -->
       {#if node.details}
@@ -355,6 +387,26 @@
   
   .detail-value {
     color: hsl(var(--foreground));
+  }
+  
+  .label-hint {
+    display: block;
+    font-weight: 400;
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    margin-top: 0.25rem;
+  }
+  
+  .image-prompt-textarea {
+    min-height: 80px;
+    font-family: inherit;
+  }
+  
+  .form-hint {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    margin-top: 0.5rem;
+    line-height: 1.4;
   }
   
   .editor-footer {

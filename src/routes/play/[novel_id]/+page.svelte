@@ -17,6 +17,7 @@
   import type { EpisodeEndingDto, FinalEndingDto, GaugeDto, EndingResponseDto } from '$lib/api/types/backend-types';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
+  import { fade } from 'svelte/transition';
   
   const novelId = $derived($page.params.novel_id);
   let novelConfig = $state<NovelConfig | null>(null);
@@ -253,10 +254,10 @@
             immediateReactionText = (selectedChoice as any).immediateReaction;
             showImmediateReaction = true;
             
-            // 2초 동안 표시 후 자동으로 사라짐
+            // 4초 동안 표시 후 자동으로 사라짐
             setTimeout(() => {
               showImmediateReaction = false;
-            }, 2000);
+            }, 4000);
           } else {
             console.log('즉각 반응 없음 또는 선택지 없음');
           }
@@ -581,7 +582,7 @@
           {/if}
           
           {#if showImmediateReaction}
-            <div class="immediate-reaction-overlay">
+            <div class="immediate-reaction-overlay" transition:fade={{ duration: 500 }}>
               <div class="immediate-reaction-card">
                 <div class="reaction-icon">💬</div>
                 <p class="reaction-text">{immediateReactionText}</p>
@@ -1296,7 +1297,7 @@
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(4px);
     z-index: 100;
-    animation: fadeIn 0.3s ease-out;
+    animation: fadeIn 0.6s ease-out;
   }
   
   @keyframes fadeIn {

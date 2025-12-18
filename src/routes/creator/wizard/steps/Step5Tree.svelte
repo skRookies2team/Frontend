@@ -18,7 +18,7 @@
   export let error = '';
   export let maxDepth = 3;
   export let onSelectNode: (e: CustomEvent<{ node: TreeNode }>) => void;
-  export let onApplyChanges: (e: CustomEvent<{ nodeId: string; newText: string; newChoices: Array<{ text: string; tags: string[] }>;}>) => void;
+  export let onApplyChanges: (e: CustomEvent<{ nodeId: string; newText: string; newChoices: Array<{ text: string; tags: string[] }>; newImagePrompt?: string;}>) => void;
   export let onCancelSelect: () => void;
   export let onGenerateNextEpisodeFromTree: () => void;
   export let onBackToSettings: () => void;
