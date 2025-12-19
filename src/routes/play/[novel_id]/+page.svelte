@@ -31,6 +31,9 @@
   let sessionId = $state<string | null>(null);
   let chatMessage = $state('');
   
+  // 대화 히스토리: { characterId: [{ role: 'user' | 'npc', message: string, timestamp: number }] }
+  let chatHistory = $state<Record<string, Array<{ role: 'user' | 'npc'; message: string; timestamp: number }>>>({});
+  
   // 즉각 반응 상태
   let showImmediateReaction = $state(false);
   let immediateReactionText = $state('');
@@ -124,6 +127,33 @@
         
         // 게임 상태 초기화
         gsm.initializeGame(novelConfig);
+        
+        // 선택된 캐릭터 조회 (NPC 대화용)
+        try {
+          const selectedCharactersResponse = await api.story.getSelectedCharacters(storyId.toString());
+          if (selectedCharactersResponse.hasSelection && selectedCharactersResponse.selectedCharacters.length > 0) {
+            // CharacterDto를 Character 타입으로 변환
+            const characters: Character[] = selectedCharactersResponse.selectedCharacters.map((char, index) => ({
+              id: char.name.toLowerCase().replace(/\s+/g, '-'), // 이름을 ID로 변환
+              name: char.name,
+              description: char.description || '',
+              personality: char.description || '', // description을 personality로도 사용
+              knowledgeBase: []
+            }));
+            
+            // novelConfig에 캐릭터 추가
+            if (novelConfig) {
+              novelConfig.characters = characters;
+            }
+            
+            console.log('선택된 NPC 캐릭터 로드 완료:', characters);
+          } else {
+            console.log('선택된 NPC가 없습니다.');
+          }
+        } catch (err) {
+          console.error('Failed to load selected characters:', err);
+          // NPC 로드 실패해도 게임은 계속 진행
+        }
         
         // 에피소드 도입부 확인
         console.log('게임 시작 - 도입부 확인:', {

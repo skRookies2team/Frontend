@@ -124,6 +124,12 @@ export interface CharacterSelectionRequestDto {
   characterNames: string[]; // 1-2 characters
 }
 
+export interface SelectedCharactersResponseDto {
+  selectedCharacterNames: string[];
+  selectedCharacters: CharacterDto[];
+  hasSelection: boolean;
+}
+
 export interface GaugeSelectionRequestDto {
   selectedGaugeIds: string[]; // exactly 2
 }

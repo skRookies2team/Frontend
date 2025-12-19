@@ -12,6 +12,7 @@ import type {
   StorySummaryResponseDto,
   StoryGaugesResponseDto,
   CharacterSelectionRequestDto,
+  SelectedCharactersResponseDto,
   GaugeSelectionRequestDto,
   GaugeSelectionResponseDto,
   StoryConfigRequestDto,
@@ -65,6 +66,13 @@ export class StoryApi {
     data: CharacterSelectionRequestDto
   ): Promise<void> {
     return httpClient.post<void>(`/api/stories/${storyId}/select-characters`, data);
+  }
+
+  /**
+   * 선택된 캐릭터 조회 (게임 플레이 중 대화 가능한 NPC 목록)
+   */
+  async getSelectedCharacters(storyId: string): Promise<SelectedCharactersResponseDto> {
+    return httpClient.get<SelectedCharactersResponseDto>(`/api/stories/${storyId}/selected-characters`);
   }
 
   /**
