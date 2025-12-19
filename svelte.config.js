@@ -14,7 +14,7 @@ const config = {
 			assets: 'build',
 			fallback: 'index.html', // SPA fallback for client-side routing
 			precompress: false,
-			strict: true
+			strict: false // Allow SPA mode for dynamic routes (S3 static hosting)
 		}),
 		// Prerender all pages for static generation
 		prerender: {
