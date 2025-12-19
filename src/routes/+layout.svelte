@@ -7,23 +7,16 @@
 	import { onMount } from 'svelte';
 	import { getCookie } from '$lib/utils/cookies';
 	
-	let { children, data } = $props();
+	let { children } = $props();
 	
 	// Hide navbar on game play pages
 	let showNavbar = $derived(!$page.url.pathname.startsWith('/play'));
 	
-	// Initialize auth store from server data or cookies (only once on mount)
+	// Initialize auth store from cookies (client-side only for S3 static deployment)
 	onMount(() => {
-		// Try server data first (for preview/dev mode)
-		if (data.user) {
-			authStore.init({
-				userId: data.user.userId,
-				username: data.user.username,
-				accessToken: data.user.accessToken,
-				refreshToken: data.user.refreshToken
-			});
-		} else if (browser) {
-			// Fallback to cookies for static build (CloudFront + S3)
+		if (browser) {
+			// Read user data from cookies for static build (CloudFront + S3)
+			// S3 is a static storage, not a server, so we cannot use server-side data
 			const accessToken = getCookie('accessToken');
 			const refreshToken = getCookie('refreshToken');
 			const userId = getCookie('userId');
