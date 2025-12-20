@@ -100,6 +100,7 @@ export interface CharacterDto {
   aliases: string[];
   description: string;
   relationships: string[];
+  chatCharacterId?: string; // 각 캐릭터별 고유 대화 ID (형식: {storyId}_{characterName})
 }
 
 export interface StoryCharactersResponseDto {
@@ -125,6 +126,9 @@ export interface CharacterSelectionRequestDto {
 }
 
 export interface SelectedCharactersResponseDto {
+  storyId: string; // StoryCreation ID
+  storyDataId: number | null; // StoryData ID (nullable)
+  chatCharacterId: string; // 공통 대화 ID (형식: {storyId} 또는 각 캐릭터별 {storyId}_{characterName})
   selectedCharacterNames: string[];
   selectedCharacters: CharacterDto[];
   hasSelection: boolean;

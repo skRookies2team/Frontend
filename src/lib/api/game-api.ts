@@ -76,6 +76,16 @@ export class GameApi {
   async getEnding(sessionId: string): Promise<EndingResponseDto> {
     return httpClient.get<EndingResponseDto>(`/api/game/${sessionId}/ending`);
   }
+
+  /**
+   * Get selected characters by StoryDataId (게임 플레이 중 NPC 대화용)
+   * 새로운 엔드포인트: GET /api/game/stories/{storyDataId}/selected-characters
+   */
+  async getSelectedCharactersByStoryDataId(storyDataId: number): Promise<import('./types/backend-types').SelectedCharactersResponseDto> {
+    return httpClient.get<import('./types/backend-types').SelectedCharactersResponseDto>(
+      `/api/game/stories/${storyDataId}/selected-characters`
+    );
+  }
 }
 
 export const gameApi = new GameApi();

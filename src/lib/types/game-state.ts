@@ -106,7 +106,8 @@ export interface NovelConfig {
  * Represents a character in the story
  */
 export interface Character {
-  id: string // Unique character identifier
+  id: string // Unique character identifier (UI용)
+  chatId?: string // RAG API용 대화 ID (형식: {storyId}_{characterName} 또는 {storyId})
   name: string // Character name
   description: string // Brief description
   personality: string // Personality traits

@@ -24,8 +24,15 @@ export class APICharacterChat implements ICharacterChatAPI {
     try {
       if (this.useBackend) {
         // Backend-Relay 서버를 통한 RAG 기반 캐릭터 응답
+        // ⚠️ 중요: character.chatId를 사용해야 함 (character.id는 UI용 ID)
+        const characterId = character.chatId || character.id;
+        
+        if (!character.chatId) {
+          console.warn(`[API] Character ${character.name} has no chatId, using id instead. This may cause errors.`);
+        }
+        
         const response = await aiApi.sendChatMessage({
-          characterId: character.id,
+          characterId: characterId, // chatId 사용 (형식: {storyId}_{characterName})
           userMessage: userQuery || "현재 상황에 대해 조언해주세요.",
           gameContext: {
             currentEpisode: `Act ${gameState.act}`,
@@ -78,8 +85,15 @@ export class APICharacterChat implements ICharacterChatAPI {
 
     try {
       console.log("[API] Indexing character for RAG:", character.name)
+      // ⚠️ 중요: character.chatId를 사용해야 함 (character.id는 UI용 ID)
+      const characterId = character.chatId || character.id;
+      
+      if (!character.chatId) {
+        console.warn(`[API] Character ${character.name} has no chatId, using id instead for indexing. This may cause errors.`);
+      }
+      
       return await aiApi.indexCharacter({
-        characterId: character.id,
+        characterId: characterId, // chatId 사용
         name: character.name,
         aliases: [],
         description: character.description,
