@@ -9,7 +9,8 @@
   import EpisodeEnding from '$lib/components/episode-ending.svelte';
   import FinalEnding from '$lib/components/final-ending.svelte';
   import EpisodeIntro from '$lib/components/episode-intro.svelte';
-  import CharacterDialog from '$lib/components/character-dialog.svelte';
+  // CharacterDialog 제거 (NPC 설명창 사용 안 함)
+  // import CharacterDialog from '$lib/components/character-dialog.svelte';
   import GameMenu from '$lib/components/game-menu.svelte';
   import { Button } from '$lib/components/ui/button';
   import { api, type StoryData } from '$lib/api';
@@ -17,35 +18,20 @@
   import type { EpisodeEndingDto, FinalEndingDto, GaugeDto, EndingResponseDto } from '$lib/api/types/backend-types';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-  import { fade } from 'svelte/transition';
   
   const novelId = $derived($page.params.novel_id);
   let novelConfig = $state<NovelConfig | null>(null);
   let storyData = $state<StoryData | null>(null);
   let useApiGame = $state(false);
   
-  let loading = $state(false);
-  let selectedCharacter = $state<{ character: Character | null; response: string }>({ character: null, response: '' });
+  let loading = $state(false); // 게임 장면 로딩용
+  let chatLoading = $state(false); // NPC 대화 전송 로딩용 (장면에 영향 없음)
+  let selectedCharacter = $state<{ character: Character | null; response: string; lastUserMessage?: string }>({ character: null, response: '' });
   let showMenu = $state(false);
   let gameInitialized = $state(false);
   let sessionId = $state<string | null>(null);
   let chatMessage = $state('');
-  let chatMessagesContainer: HTMLDivElement | null = $state(null);
-  
-  // 대화 히스토리: { chatId: [{ role: 'user' | 'npc', message: string, timestamp: number }] }
-  let chatHistory = $state<Record<string, Array<{ role: 'user' | 'npc'; message: string; timestamp: number }>>>({});
-  
-  // 채팅 메시지 영역 자동 스크롤
-  function scrollToBottom() {
-    if (chatMessagesContainer) {
-      setTimeout(() => {
-        chatMessagesContainer?.scrollTo({
-          top: chatMessagesContainer.scrollHeight,
-          behavior: 'smooth'
-        });
-      }, 100);
-    }
-  }
+  let chatMessagesContainer: HTMLDivElement;
   
   // 즉각 반응 상태
   let showImmediateReaction = $state(false);
@@ -93,28 +79,33 @@
           return;
         }
         
-        // 최적화: getAllStories() 호출 제거하고 startGame()를 먼저 호출
-        // startGame()가 실패하면 스토리가 존재하지 않는 것이므로 에러 처리됨
-        // 선택된 캐릭터 조회는 startGame()와 병렬로 실행 가능하지만,
-        // novelConfig 생성에 필요한 정보가 있으므로 startGame() 후에 실행
+        // 모든 스토리 목록에서 해당 ID 찾기
+        const allStories = await api.game.getAllStories();
+        const foundStory = allStories.find(s => s.id === storyId);
         
-        // API 게임 시작 (스토리 존재 여부도 함께 확인)
+        if (!foundStory) {
+          console.error('Story not found:', storyId);
+          window.location.href = '/';
+          return;
+        }
+        
+        storyData = foundStory;
+        
+        // API 게임 시작
         const gameStateResponse = await api.game.startGame({ storyDataId: storyId });
         sessionId = gameStateResponse.sessionId;
         
-        // startGame()와 병렬로 선택된 캐릭터 조회 시작 (NPC 대화용)
-        // 새로운 엔드포인트 사용: GET /api/game/stories/{storyDataId}/selected-characters
+        // 선택된 캐릭터 조회 시작 (NPC 대화용) - 병렬로 실행
         const selectedCharactersPromise = api.game.getSelectedCharactersByStoryDataId(storyId).catch(err => {
           console.error('Failed to load selected characters:', err);
           return null; // NPC 로드 실패해도 게임은 계속 진행
         });
         
         // 최소한의 NovelConfig 생성 (API 게임용)
-        // startGame() 응답에서 스토리 정보를 가져올 수 없으므로 임시 값 사용
         novelConfig = {
           id: novelId,
-          title: gameStateResponse.episodeTitle || '게임', // 임시 제목
-          description: '',
+          title: foundStory.title,
+          description: foundStory.description || '',
           author: '사용자 생성',
           category: '사용자 생성',
           difficulty: '중급',
@@ -308,10 +299,10 @@
             immediateReactionText = (selectedChoice as any).immediateReaction;
             showImmediateReaction = true;
             
-            // 4초 동안 표시 후 자동으로 사라짐
+            // 2초 동안 표시 후 자동으로 사라짐
             setTimeout(() => {
               showImmediateReaction = false;
-            }, 4000);
+            }, 2000);
           } else {
             console.log('즉각 반응 없음 또는 선택지 없음');
           }
@@ -449,80 +440,52 @@
   function handleNpcSelect(character: Character) {
     if (selectedCharacter.character?.id === character.id) {
       // 같은 NPC를 다시 클릭하면 닫기
-      selectedCharacter = { character: null, response: '' };
+      selectedCharacter.character = null;
+      selectedCharacter.response = '';
+      selectedCharacter.lastUserMessage = undefined;
       chatMessage = '';
     } else {
       // 다른 NPC 선택
-      selectedCharacter = { character, response: '' };
+      selectedCharacter.character = character;
+      selectedCharacter.response = '';
+      selectedCharacter.lastUserMessage = undefined;
       chatMessage = '';
-      
-      // 캐릭터별 대화 히스토리 로드 (나중에 백엔드 API로 로드 가능)
-      // 현재는 로컬 히스토리만 사용
-      const chatKey = character.chatId || character.id;
-      if (!chatHistory[chatKey]) {
-        chatHistory[chatKey] = [];
-      }
     }
   }
   
   async function handleSendMessage() {
-    if (!chatMessage.trim() || !selectedCharacter.character || loading) return;
+    if (!chatMessage.trim() || !selectedCharacter.character || chatLoading) return;
     
     const message = chatMessage.trim();
     const userMessage = message;
     chatMessage = '';
-    loading = true;
-    
-    // 캐릭터의 chatId를 키로 사용 (없으면 id 사용)
-    const chatKey = selectedCharacter.character.chatId || selectedCharacter.character.id;
+    chatLoading = true;
     
     try {
-      // 사용자 메시지를 히스토리에 추가
-      if (!chatHistory[chatKey]) {
-        chatHistory[chatKey] = [];
-      }
-      chatHistory[chatKey].push({
-        role: 'user',
-        message: userMessage,
-        timestamp: Date.now()
-      });
+      // 사용자 메시지 저장
+      selectedCharacter.lastUserMessage = userMessage;
       
-      // NPC 응답 받기
+      // NPC 응답 받기 (히스토리는 백엔드에서 관리하므로 전달하지 않음)
       const responseText = await characterChat.getCharacterResponse(
         selectedCharacter.character,
         gsm.currentState,
-        userMessage
+        userMessage,
+        [] // 백엔드가 히스토리 관리하므로 빈 배열 전달
       );
       
-      // 응답에서 캐릭터 이름 제거 (이미 추가되어 있을 수 있음)
-      const npcMessage = responseText.includes(':') 
-        ? responseText.split(':').slice(1).join(':').trim() 
-        : responseText;
+      console.log('[DEBUG] RAG 서버 응답 받음:', responseText);
       
-      // NPC 응답을 히스토리에 추가
-      chatHistory[chatKey].push({
-        role: 'npc',
-        message: npcMessage,
-        timestamp: Date.now()
-      });
+      // NPC 응답 저장 (직접 속성 변경으로 반응성 보장)
+      selectedCharacter.response = responseText;
       
-      // 채팅 영역 자동 스크롤을 위해 강제 업데이트
-      chatHistory = { ...chatHistory };
-      
-      // 스크롤을 맨 아래로 이동
-      scrollToBottom();
+      console.log('[DEBUG] selectedCharacter 업데이트 완료:', selectedCharacter);
     } catch (err) {
       console.error('Failed to send message:', err);
       alert('메시지 전송에 실패했습니다.');
-      
       // 에러 발생 시 사용자 메시지도 롤백
-      if (chatHistory[chatKey]) {
-        chatHistory[chatKey] = chatHistory[chatKey].filter(
-          msg => !(msg.role === 'user' && msg.message === userMessage && msg.timestamp > Date.now() - 1000)
-        );
-      }
+      selectedCharacter.lastUserMessage = undefined;
     } finally {
-      loading = false;
+      chatLoading = false;
     }
   }
   
@@ -677,7 +640,7 @@
           {/if}
           
           {#if showImmediateReaction}
-            <div class="immediate-reaction-overlay" transition:fade={{ duration: 500 }}>
+            <div class="immediate-reaction-overlay">
               <div class="immediate-reaction-card">
                 <div class="reaction-icon">💬</div>
                 <p class="reaction-text">{immediateReactionText}</p>
@@ -735,7 +698,11 @@
                     <button 
                       type="button"
                       class="chat-close-btn"
-                      onclick={() => selectedCharacter = { character: null, response: '' }}
+                      onclick={() => {
+                        selectedCharacter.character = null;
+                        selectedCharacter.response = '';
+                        selectedCharacter.lastUserMessage = undefined;
+                      }}
                       aria-label="대화 닫기"
                     >
                       ✕
@@ -756,11 +723,8 @@
                 <!-- 대화 메시지 영역 -->
                 <div class="chat-messages" bind:this={chatMessagesContainer}>
                   {#if selectedCharacter.character}
-                    {@const chatKey = selectedCharacter.character.chatId || selectedCharacter.character.id}
-                    {@const history = chatHistory[chatKey] || []}
-                    
-                    <!-- 첫 인사말 (히스토리가 없을 때만) -->
-                    {#if history.length === 0}
+                    <!-- 첫 인사말 -->
+                    {#if !selectedCharacter.lastUserMessage && !selectedCharacter.response}
                       <div class="chat-message npc-message">
                         <div class="message-avatar">{selectedCharacter.character.name.charAt(0)}</div>
                         <div class="message-content">
@@ -769,24 +733,25 @@
                       </div>
                     {/if}
                     
-                    <!-- 대화 히스토리 표시 -->
-                    {#each history as msg (msg.timestamp)}
-                      {#if msg.role === 'user'}
-                        <div class="chat-message user-message">
-                          <div class="message-content">
-                            <p>{msg.message}</p>
-                          </div>
-                          <div class="message-avatar">나</div>
+                    <!-- 사용자 메시지 표시 -->
+                    {#if selectedCharacter.lastUserMessage}
+                      <div class="chat-message user-message">
+                        <div class="message-content">
+                          <p>{selectedCharacter.lastUserMessage}</p>
                         </div>
-                      {:else}
-                        <div class="chat-message npc-message">
-                          <div class="message-avatar">{selectedCharacter.character.name.charAt(0)}</div>
-                          <div class="message-content">
-                            <p>{msg.message}</p>
-                          </div>
+                        <div class="message-avatar">나</div>
+                      </div>
+                    {/if}
+                    
+                    <!-- NPC 응답 표시 -->
+                    {#if selectedCharacter.response}
+                      <div class="chat-message npc-message">
+                        <div class="message-avatar">{selectedCharacter.character.name.charAt(0)}</div>
+                        <div class="message-content">
+                          <p>{selectedCharacter.response}</p>
                         </div>
-                      {/if}
-                    {/each}
+                      </div>
+                    {/if}
                   {:else}
                     <div class="chat-empty-state-inline">
                       <div class="empty-icon">💬</div>
@@ -815,10 +780,10 @@
                       type="button"
                       class="chat-send-btn"
                       onclick={handleSendMessage}
-                      disabled={!chatMessage.trim() || loading || !selectedCharacter.character}
+                      disabled={!chatMessage.trim() || chatLoading || !selectedCharacter.character}
                       aria-label="메시지 전송"
                     >
-                      {#if loading}
+                      {#if chatLoading}
                         <div class="spinner-small"></div>
                       {:else}
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -837,14 +802,17 @@
     </main>
   </div>
   
-  <!-- CharacterDialog는 현재 사용하지 않음 (사이드바 채팅 인터페이스 사용) -->
-  <!-- 필요시 주석 해제 가능 -->
+  <!-- CharacterDialog 제거 (NPC 설명창 사용 안 함) -->
   <!--
-  {#if selectedCharacter.character && selectedCharacter.response}
+  {#if selectedCharacter.character}
     <CharacterDialog
       character={selectedCharacter.character}
       response={selectedCharacter.response}
-      onClose={() => selectedCharacter = { character: null, response: '' }}
+      onClose={() => {
+        selectedCharacter.character = null;
+        selectedCharacter.response = '';
+        selectedCharacter.lastUserMessage = undefined;
+      }}
     />
   {/if}
   -->
@@ -1411,7 +1379,7 @@
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(4px);
     z-index: 100;
-    animation: fadeIn 0.6s ease-out;
+    animation: fadeIn 0.3s ease-out;
   }
   
   @keyframes fadeIn {

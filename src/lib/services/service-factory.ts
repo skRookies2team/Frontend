@@ -40,14 +40,14 @@ class ServiceFactory {
 
   /**
    * Get Character Chat instance (singleton)
+   * 항상 백엔드 API를 사용하도록 설정 (Mock 모드 비활성화)
    */
   getCharacterChat(): ICharacterChatAPI {
     if (!this.characterChatInstance) {
-      this.characterChatInstance = isMockMode()
-        ? new MockCharacterChat()
-        : new APICharacterChat()
+      // 항상 백엔드 API 사용 (Mock 모드 비활성화)
+      this.characterChatInstance = new APICharacterChat()
       
-      console.log(`[ServiceFactory] Created ${isMockMode() ? 'Mock' : 'API'} Character Chat`)
+      console.log(`[ServiceFactory] Created API Character Chat (백엔드 연결)`)
     }
     return this.characterChatInstance
   }

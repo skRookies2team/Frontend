@@ -18,10 +18,13 @@
   <div class="flex items-start justify-between">
     <div>
       <h3 class="font-semibold text-lg">{character.name}</h3>
-      <p class="text-sm text-muted-foreground mt-1">{character.description}</p>
+      <!-- 인물 설명 숨김 -->
+      <!-- <p class="text-sm text-muted-foreground mt-1">{character.description}</p> -->
     </div>
   </div>
   
+  <!-- 관계도, 신뢰도 숨김 -->
+  <!--
   <div class="stats-row">
     <div class="stat">
       <span class="stat-label">관계도</span>
@@ -35,6 +38,7 @@
       <span class="stat-value text-primary">{trust}%</span>
     </div>
   </div>
+  -->
 </button>
 
 <style>

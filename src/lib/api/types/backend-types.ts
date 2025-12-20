@@ -550,6 +550,31 @@ export interface PostMediaUploadResponseDto {
   message: string;
 }
 
+// ==================== RAG Chat ====================
+
+export interface RagChatRequestDto {
+  characterId: string;
+  userMessage: string;
+  conversationHistory: Array<{
+    role: string;
+    content: string;
+  }>;
+  maxTokens?: number; // 기본값 4000
+}
+
+export interface RagChatSourceDto {
+  text: string;
+  score: number;
+  sourceType: string;
+}
+
+export interface RagChatResponseDto {
+  characterId: string;
+  aiMessage: string;
+  sources: RagChatSourceDto[];
+  timestamp: string;
+}
+
 // ==================== Health Check ====================
 
 export interface HealthCheckResponse {

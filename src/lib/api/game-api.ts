@@ -10,7 +10,9 @@ import type {
   StoryData,
   GenerateStoryRequestDto,
   HealthCheckResponse,
-  EndingResponseDto
+  EndingResponseDto,
+  RagChatRequestDto,
+  RagChatResponseDto
 } from './types/backend-types';
 
 export class GameApi {
@@ -84,6 +86,24 @@ export class GameApi {
   async getSelectedCharactersByStoryDataId(storyDataId: number): Promise<import('./types/backend-types').SelectedCharactersResponseDto> {
     return httpClient.get<import('./types/backend-types').SelectedCharactersResponseDto>(
       `/api/game/stories/${storyDataId}/selected-characters`
+    );
+  }
+
+  /**
+   * RAG 기반 NPC 대화
+   * 엔드포인트: POST /api/rag/chat
+   */
+  async ragChat(data: RagChatRequestDto): Promise<RagChatResponseDto> {
+    return httpClient.post<RagChatResponseDto>('/api/rag/chat', data);
+  }
+
+  /**
+   * 대화 히스토리 조회
+   * 엔드포인트: GET /api/rag/conversations/{characterId}
+   */
+  async getConversationHistory(characterId: string): Promise<Array<{ role: string; content: string; timestamp: string }>> {
+    return httpClient.get<Array<{ role: string; content: string; timestamp: string }>>(
+      `/api/rag/conversations/${characterId}`
     );
   }
 }

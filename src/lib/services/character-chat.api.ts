@@ -7,23 +7,26 @@ import type { Character, GameState } from "$lib/types/game-state"
 import type { ICharacterChatAPI } from "$lib/api/types/service-types"
 import { createLLMClient } from "$lib/api/llm-client"
 import { aiApi } from "$lib/api/ai-api"
+import { api } from "$lib/api"
 import { appConfig } from "$lib/config/app-config"
 import { getCharacterKnowledge } from "$lib/data/mock-knowledge"
 
 export class APICharacterChat implements ICharacterChatAPI {
   private llmClient = createLLMClient()
-  private useBackend = appConfig.apiMode === 'production'
+  // 백엔드 RAG API를 항상 사용 (새로운 /api/rag/chat 엔드포인트)
+  private useBackend = true
 
   async getCharacterResponse(
     character: Character,
     gameState: GameState,
-    userQuery?: string
+    userQuery?: string,
+    conversationHistory?: Array<{ role: 'user' | 'npc'; message: string }>
   ): Promise<string> {
-    console.log("[API] Getting character response using", this.useBackend ? "Backend-Relay" : "Direct LLM", ":", character.name)
+    console.log("[API] Getting character response using", this.useBackend ? "Backend RAG API" : "Direct LLM", ":", character.name)
 
     try {
       if (this.useBackend) {
-        // Backend-Relay 서버를 통한 RAG 기반 캐릭터 응답
+        // 새로운 백엔드 RAG 채팅 API 사용: POST /api/rag/chat
         // ⚠️ 중요: character.chatId를 사용해야 함 (character.id는 UI용 ID)
         const characterId = character.chatId || character.id;
         
@@ -31,17 +34,16 @@ export class APICharacterChat implements ICharacterChatAPI {
           console.warn(`[API] Character ${character.name} has no chatId, using id instead. This may cause errors.`);
         }
         
-        const response = await aiApi.sendChatMessage({
+        // 백엔드가 히스토리를 관리하므로 프론트엔드에서 전달하지 않음
+        // 백엔드가 자동으로 해당 characterId의 히스토리를 가져와서 사용
+        const response = await api.game.ragChat({
           characterId: characterId, // chatId 사용 (형식: {storyId}_{characterName})
           userMessage: userQuery || "현재 상황에 대해 조언해주세요.",
-          gameContext: {
-            currentEpisode: `Act ${gameState.act}`,
-            currentNode: `Scene ${gameState.scene}`,
-            gaugeStates: gameState.themeGauges,
-            relationships: gameState.relationships
-          }
-        })
-        return `${character.name}: ${response.aiMessage}`
+          conversationHistory: [], // 백엔드가 히스토리 관리하므로 빈 배열
+          maxTokens: 4000
+        });
+        
+        return response.aiMessage; // 캐릭터 이름은 포함하지 않음 (백엔드에서 처리)
       } else {
         // 직접 LLM API 호출 (기존 방식)
         const relationship = gameState.relationships[character.id] || 0
