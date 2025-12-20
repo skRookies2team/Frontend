@@ -80,27 +80,27 @@
           return;
         }
         
-        // 모든 스토리 목록에서 해당 ID 찾기
-        const allStories = await api.game.getAllStories();
-        const foundStory = allStories.find(s => s.id === storyId);
+        // 최적화: getAllStories() 호출 제거하고 startGame()를 먼저 호출
+        // startGame()가 실패하면 스토리가 존재하지 않는 것이므로 에러 처리됨
+        // 선택된 캐릭터 조회는 startGame()와 병렬로 실행 가능하지만,
+        // novelConfig 생성에 필요한 정보가 있으므로 startGame() 후에 실행
         
-        if (!foundStory) {
-          console.error('Story not found:', storyId);
-          window.location.href = '/';
-          return;
-        }
-        
-        storyData = foundStory;
-        
-        // API 게임 시작
+        // API 게임 시작 (스토리 존재 여부도 함께 확인)
         const gameStateResponse = await api.game.startGame({ storyDataId: storyId });
         sessionId = gameStateResponse.sessionId;
         
+        // startGame()와 병렬로 선택된 캐릭터 조회 시작 (NPC 대화용)
+        const selectedCharactersPromise = api.story.getSelectedCharacters(storyId.toString()).catch(err => {
+          console.error('Failed to load selected characters:', err);
+          return null; // NPC 로드 실패해도 게임은 계속 진행
+        });
+        
         // 최소한의 NovelConfig 생성 (API 게임용)
+        // startGame() 응답에서 스토리 정보를 가져올 수 없으므로 임시 값 사용
         novelConfig = {
           id: novelId,
-          title: foundStory.title,
-          description: foundStory.description || '',
+          title: gameStateResponse.episodeTitle || '게임', // 임시 제목
+          description: '',
           author: '사용자 생성',
           category: '사용자 생성',
           difficulty: '중급',
@@ -128,10 +128,10 @@
         // 게임 상태 초기화
         gsm.initializeGame(novelConfig);
         
-        // 선택된 캐릭터 조회 (NPC 대화용)
+        // 선택된 캐릭터 조회 결과 처리 (이미 병렬로 시작됨)
         try {
-          const selectedCharactersResponse = await api.story.getSelectedCharacters(storyId.toString());
-          if (selectedCharactersResponse.hasSelection && selectedCharactersResponse.selectedCharacters.length > 0) {
+          const selectedCharactersResponse = await selectedCharactersPromise;
+          if (selectedCharactersResponse && selectedCharactersResponse.hasSelection && selectedCharactersResponse.selectedCharacters.length > 0) {
             // CharacterDto를 Character 타입으로 변환
             const characters: Character[] = selectedCharactersResponse.selectedCharacters.map((char, index) => ({
               id: char.name.toLowerCase().replace(/\s+/g, '-'), // 이름을 ID로 변환
