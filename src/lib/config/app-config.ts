@@ -55,7 +55,8 @@ function isValidUrl(url: string): boolean {
  */
 function getEnvVar(key: string, defaultValue?: string, required = false): string {
   const isBrowser = typeof window !== 'undefined';
-  const env = isBrowser ? import.meta.env : {};
+  // SvelteKit/Vite에서 import.meta.env는 빌드 시점에 환경 변수가 주입됨
+  const env = isBrowser ? (import.meta.env as Record<string, string | undefined>) : {};
   const value = env[key] || defaultValue;
 
   if (required && !value) {
@@ -81,11 +82,12 @@ function getEnvVar(key: string, defaultValue?: string, required = false): string
  */
 function loadConfig(): AppConfig {
   const isBrowser = typeof window !== 'undefined';
-  const env = isBrowser ? import.meta.env : {};
+  // SvelteKit/Vite에서 import.meta.env는 빌드 시점에 환경 변수가 주입됨
+  const env = (isBrowser ? import.meta.env : {}) as Record<string, string | boolean | undefined>;
   
   // 프로덕션 모드 확인
   const isProduction = env.MODE === 'production' || env.PROD === true;
-  const apiMode = (env.PUBLIC_API_MODE || 'mock') as APIMode;
+  const apiMode = ((env.PUBLIC_API_MODE as string) || 'mock') as APIMode;
   const isProductionMode = apiMode === 'production';
 
   // 기본 URL (개발 환경용)
@@ -103,6 +105,34 @@ function loadConfig(): AppConfig {
     defaultRelayUrl,
     isProduction && isProductionMode
   );
+
+  // 프로덕션 환경에서 localhost 사용 감지 및 에러
+  // 빌드 시점에 검증하여 잘못된 설정으로 배포되는 것을 방지
+  if (isProduction && isProductionMode) {
+    const isLocalhost = (url: string) => 
+      url.includes('localhost') || url.includes('127.0.0.1') || url.includes('0.0.0.0');
+    
+    if (isLocalhost(baseUrl)) {
+      const errorMsg = 
+        `🚨 배포 환경 오류: PUBLIC_API_BASE_URL이 localhost로 설정되어 있습니다 (${baseUrl})\n` +
+        `배포 환경에서는 실제 서버 도메인을 사용해야 합니다.\n` +
+        `예: https://api.yourdomain.com\n` +
+        `배포 플랫폼의 환경 변수 설정을 확인하세요.`;
+      console.error(`[Config Error] ${errorMsg}`);
+      // 프로덕션 빌드 시 에러를 던져서 빌드 실패를 명확히 함
+      throw new Error(errorMsg);
+    }
+    
+    if (isLocalhost(relayUrl)) {
+      const errorMsg = 
+        `🚨 배포 환경 오류: PUBLIC_RELAY_API_URL이 localhost로 설정되어 있습니다 (${relayUrl})\n` +
+        `배포 환경에서는 실제 서버 도메인을 사용해야 합니다.\n` +
+        `예: https://relay.yourdomain.com\n` +
+        `배포 플랫폼의 환경 변수 설정을 확인하세요.`;
+      console.error(`[Config Error] ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+  }
 
   // URL 형식 검증
   if (isProductionMode && !isValidUrl(baseUrl)) {
@@ -128,19 +158,19 @@ function loadConfig(): AppConfig {
     },
     
     llm: {
-      provider: (env.PUBLIC_LLM_PROVIDER || 'openai') as LLMProvider,
-      apiKey: env.PUBLIC_OPENAI_API_KEY || env.PUBLIC_ANTHROPIC_API_KEY || '',
-      model: env.PUBLIC_OPENAI_MODEL || env.PUBLIC_ANTHROPIC_MODEL || 'gpt-4-turbo-preview',
+      provider: ((env.PUBLIC_LLM_PROVIDER as string) || 'openai') as LLMProvider,
+      apiKey: ((env.PUBLIC_OPENAI_API_KEY as string) || (env.PUBLIC_ANTHROPIC_API_KEY as string) || ''),
+      model: ((env.PUBLIC_OPENAI_MODEL as string) || (env.PUBLIC_ANTHROPIC_MODEL as string) || 'gpt-4-turbo-preview'),
     },
     
     image: {
-      provider: (env.PUBLIC_IMAGE_API_PROVIDER || 'backend') as ImageProvider,
-      apiKey: env.PUBLIC_IMAGE_API_KEY || '',
-      model: env.PUBLIC_IMAGE_MODEL || 'dall-e-3',
+      provider: ((env.PUBLIC_IMAGE_API_PROVIDER as string) || 'backend') as ImageProvider,
+      apiKey: (env.PUBLIC_IMAGE_API_KEY as string) || '',
+      model: (env.PUBLIC_IMAGE_MODEL as string) || 'dall-e-3',
     },
     
     storage: {
-      type: (env.PUBLIC_STORAGE_TYPE || 'localStorage') as StorageType,
+      type: ((env.PUBLIC_STORAGE_TYPE as string) || 'localStorage') as StorageType,
     },
   }
 }

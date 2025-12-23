@@ -144,6 +144,9 @@ PUBLIC_STORAGE_TYPE=api
 
 3. **환경변수 설정 확인**: 배포 플랫폼(Vercel, Netlify, AWS 등)에서 환경변수를 올바르게 설정했는지 확인하세요
 
+4. **빌드 시점 검증**: 프로덕션 빌드 시 `localhost`를 사용하면 빌드가 실패합니다
+   - 환경 변수가 올바르게 설정되지 않으면 빌드 오류가 발생하여 배포 전에 문제를 발견할 수 있습니다
+
 ## 주의사항
 
 ⚠️ **보안 주의사항**
@@ -211,6 +214,67 @@ console.log(import.meta.env.PUBLIC_RELAY_API_URL);   // 릴레이 서버 URL
 console.log(import.meta.env.PUBLIC_API_MODE);         // 'mock' 또는 'production'
 console.log(import.meta.env.PUBLIC_IMAGE_API_PROVIDER); // 'backend', 'openai' 등
 ```
+
+## 배포 플랫폼별 환경 변수 설정
+
+### GitHub Actions (AWS S3 + CloudFront)
+
+`.github/workflows/deploy.yml`에서 빌드 단계에 환경 변수를 설정합니다:
+
+```yaml
+- name: Build project
+  env:
+    PUBLIC_API_BASE_URL: ${{ secrets.PUBLIC_API_BASE_URL }}
+    PUBLIC_RELAY_API_URL: ${{ secrets.PUBLIC_RELAY_API_URL }}
+    PUBLIC_API_MODE: ${{ secrets.PUBLIC_API_MODE }}
+  run: npm run build
+```
+
+GitHub 저장소의 Settings > Secrets and variables > Actions에서 다음 Secrets를 설정하세요:
+- `PUBLIC_API_BASE_URL`: `https://api.yourdomain.com`
+- `PUBLIC_RELAY_API_URL`: `https://relay.yourdomain.com`
+- `PUBLIC_API_MODE`: `production`
+
+### Vercel
+
+1. Vercel 대시보드 > 프로젝트 > Settings > Environment Variables로 이동
+2. 다음 환경 변수를 추가:
+   - `PUBLIC_API_BASE_URL`: `https://api.yourdomain.com`
+   - `PUBLIC_RELAY_API_URL`: `https://relay.yourdomain.com`
+   - `PUBLIC_API_MODE`: `production`
+3. Environment를 `Production`, `Preview`, `Development`로 설정 (필요한 경우)
+4. 변경사항 저장 후 재배포
+
+### Netlify
+
+1. Netlify 대시보드 > Site settings > Environment variables로 이동
+2. 다음 환경 변수를 추가:
+   - `PUBLIC_API_BASE_URL`: `https://api.yourdomain.com`
+   - `PUBLIC_RELAY_API_URL`: `https://relay.yourdomain.com`
+   - `PUBLIC_API_MODE`: `production`
+3. 변경사항 저장 후 재배포
+
+### AWS Amplify
+
+1. Amplify Console > App settings > Environment variables로 이동
+2. 다음 환경 변수를 추가:
+   - `PUBLIC_API_BASE_URL`: `https://api.yourdomain.com`
+   - `PUBLIC_RELAY_API_URL`: `https://relay.yourdomain.com`
+   - `PUBLIC_API_MODE`: `production`
+3. 변경사항 저장 후 재배포
+
+### 환경 변수 확인 방법
+
+배포 후 브라우저 개발자 도구 콘솔에서 다음을 실행하여 설정을 확인할 수 있습니다:
+
+```javascript
+// 브라우저 콘솔에서 실행
+console.log('API Base URL:', import.meta.env.PUBLIC_API_BASE_URL);
+console.log('Relay API URL:', import.meta.env.PUBLIC_RELAY_API_URL);
+console.log('API Mode:', import.meta.env.PUBLIC_API_MODE);
+```
+
+⚠️ **주의**: `localhost`가 표시되면 환경 변수가 올바르게 설정되지 않은 것입니다.
 
 ## 추가 리소스
 
