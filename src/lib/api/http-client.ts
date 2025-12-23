@@ -37,6 +37,8 @@ export interface RequestConfig extends RequestInit {
 
 class HttpClient {
   private baseUrl: string;
+  private isRefreshing = false;
+  private refreshPromise: Promise<void> | null = null;
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
@@ -94,11 +96,50 @@ class HttpClient {
   }
 
   /**
+   * Refresh token and wait for it to complete
+   * This prevents multiple simultaneous refresh requests
+   * Uses dynamic import to avoid circular dependency
+   */
+  private async handleTokenRefresh(): Promise<void> {
+    // If already refreshing, wait for the existing refresh to complete
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    // Start refresh process
+    this.isRefreshing = true;
+    this.refreshPromise = (async () => {
+      try {
+        // Use dynamic import to avoid circular dependency
+        const { authApi } = await import('./auth-api');
+        await authApi.refreshToken();
+      } catch (error) {
+        console.error('[Token Refresh] Failed to refresh token:', error);
+        // If refresh fails, clear tokens and redirect to login
+        if (typeof window !== 'undefined') {
+          // Clear auth cookies
+          const { clearAuthCookies } = await import('$lib/utils/cookies');
+          clearAuthCookies();
+          // Redirect to login page
+          window.location.href = '/login';
+        }
+        throw error;
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
+  }
+
+  /**
    * Make HTTP request
    */
   private async request<T>(
     path: string,
-    config: RequestConfig = {}
+    config: RequestConfig = {},
+    isRetry: boolean = false
   ): Promise<T> {
     const { params, requiresAuth = true, headers = {}, ...init } = config;
 
@@ -130,6 +171,48 @@ class HttpClient {
 
       // Handle non-OK responses
       if (!response.ok) {
+        // Handle 401 Unauthorized - try to refresh token
+        // Check before reading response body to avoid consuming it
+        if (response.status === 401 && requiresAuth && !isRetry) {
+          // Skip refresh for auth endpoints to avoid infinite loop
+          if (!path.includes('/api/auth/refresh') && !path.includes('/api/auth/login')) {
+            try {
+              // Clone response to read error data later if refresh fails
+              const responseClone = response.clone();
+              
+              // Wait for token refresh to complete
+              await this.handleTokenRefresh();
+              
+              // Retry the original request with new token
+              return this.request<T>(path, config, true);
+            } catch (refreshError) {
+              // Refresh failed, read and throw the original 401 error
+              console.error('[Token Refresh] Token refresh failed, redirecting to login');
+              
+              // Read error data from cloned response
+              let errorData;
+              const contentType = response.headers.get('content-type');
+              try {
+                const text = await response.text();
+                if (contentType && contentType.includes('application/json') && text) {
+                  try {
+                    errorData = JSON.parse(text);
+                  } catch {
+                    errorData = text;
+                  }
+                } else {
+                  errorData = text;
+                }
+              } catch {
+                errorData = 'Token refresh failed';
+              }
+              
+              throw new ApiError(response.status, response.statusText, errorData);
+            }
+          }
+        }
+
+        // Read error data for non-401 errors or when refresh is not applicable
         let errorData;
         const contentType = response.headers.get('content-type');
         

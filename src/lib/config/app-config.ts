@@ -91,8 +91,8 @@ function loadConfig(): AppConfig {
   const isProductionMode = apiMode === 'production';
 
   // 기본 URL (개발 환경용)
-  const defaultBaseUrl = 'http://localhost:8080';
-  const defaultRelayUrl = 'http://localhost:8081';
+  const defaultBaseUrl = 'http://43.202.142.50';
+  const defaultRelayUrl = 'http://43.202.142.50';
 
   // 프로덕션 모드에서는 환경변수 필수
   const baseUrl = getEnvVar(
