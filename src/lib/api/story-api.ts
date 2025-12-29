@@ -23,6 +23,11 @@ import type {
   EpisodeDto,
   UpdateNodeRequestDto,
   RegenerateSubtreeResponseDto,
+  NodeImageResponseDto,
+  ImageUploadUrlRequestDto,
+  ImageUploadUrlResponseDto,
+  ImageRegenerateRequestDto,
+  ImageRegenerateResponseDto,
 } from './types/backend-types';
 
 export class StoryApi {
@@ -164,6 +169,48 @@ export class StoryApi {
    */
   async getFullStoryData(storyId: string): Promise<any> {
     return httpClient.get<any>(`/api/stories/${storyId}/data`);
+  }
+
+  // ==================== Image Management ====================
+
+  /**
+   * 노드 이미지 정보 조회
+   * 특정 스토리 노드에 연결된 이미지 정보를 가져옵니다
+   */
+  async getNodeImage(storyId: string, nodeId: string): Promise<NodeImageResponseDto> {
+    return httpClient.get<NodeImageResponseDto>(
+      `/api/stories/${storyId}/images/nodes/${nodeId}`
+    );
+  }
+
+  /**
+   * 이미지 업로드용 URL 발급
+   * 이미지를 S3에 직접 업로드하기 위한 presigned URL을 생성합니다
+   */
+  async getImageUploadUrl(
+    storyId: string,
+    nodeId: string,
+    data: ImageUploadUrlRequestDto
+  ): Promise<ImageUploadUrlResponseDto> {
+    return httpClient.post<ImageUploadUrlResponseDto>(
+      `/api/stories/${storyId}/images/nodes/${nodeId}/upload`,
+      data
+    );
+  }
+
+  /**
+   * 이미지 AI 재생성
+   * 사용자의 프롬프트를 바탕으로 AI를 통해 이미지를 새로 생성합니다
+   */
+  async regenerateNodeImage(
+    storyId: string,
+    nodeId: string,
+    data: ImageRegenerateRequestDto
+  ): Promise<ImageRegenerateResponseDto> {
+    return httpClient.post<ImageRegenerateResponseDto>(
+      `/api/stories/${storyId}/images/nodes/${nodeId}/regenerate`,
+      data
+    );
   }
 }
 

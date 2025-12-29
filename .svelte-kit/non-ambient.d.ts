@@ -46,6 +46,6 @@ declare module "$app/types" {
 		};
 		Pathname(): "/" | "/community" | "/community/" | `/community/${string}` & {} | `/community/${string}/` & {} | "/creator" | "/creator/" | "/creator/wizard" | "/creator/wizard/" | "/creator/wizard/steps" | "/creator/wizard/steps/" | "/login" | "/login/" | "/play" | "/play/" | `/play/${string}` & {} | `/play/${string}/` & {} | "/profile" | "/profile/";
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
-		Asset(): "/111281-690770684_small.mp4" | "/1920s-art-deco-mansion-gatsby-party-luxury.jpg" | "/1920s-art-deco-mansion-party.jpg" | "/19th-century-russia-dark-street.jpg" | "/boys-on-deserted-island-survival.jpg" | "/boys-stranded-on-tropical-island-survival.jpg" | "/dark-19th-century-russian-street-atmospheric.jpg" | "/dark-room-insect-kafka.jpg" | "/dark-room-kafka-metamorphosis-surreal.jpg" | "/dystopian-city-surveillance-big-brother-1984.jpg" | "/dystopian-city-surveillance-big-brother.jpg" | "/favicon.png" | "/regency-era-ballroom-england-elegant.jpg" | "/regency-era-ballroom-england.jpg" | string & {};
+		Asset(): "/111281-690770684_small.mp4" | "/favicon.png" | string & {};
 	}
 }

@@ -192,6 +192,7 @@
         const apiScene = {
           id: gameStateResponse.currentNodeId,
           story: gameStateResponse.nodeText,
+          imageUrl: gameStateResponse.nodeImage?.imageUrl,
           choices: gameStateResponse.choices.map((c, idx) => ({
             id: `choice-${idx}`,
             text: c.text,
@@ -243,6 +244,7 @@
               const nextScene = {
                 id: gameStateResponse.currentNodeId,
                 story: gameStateResponse.nodeText,
+                imageUrl: gameStateResponse.nodeImage?.imageUrl,
                 choices: gameStateResponse.choices.map((c, idx) => ({
                   id: `choice-${idx}`,
                   text: c.text,
@@ -406,6 +408,7 @@
           const nextScene = {
             id: gameStateResponse.currentNodeId,
             story: gameStateResponse.nodeText,
+            imageUrl: gameStateResponse.nodeImage?.imageUrl,
             choices: gameStateResponse.choices.map((c, idx) => ({
               id: `choice-${idx}`,
               text: c.text,
@@ -596,6 +599,7 @@
                     const nextScene = {
                       id: gameStateResponse.currentNodeId,
                       story: gameStateResponse.nodeText,
+                      imageUrl: gameStateResponse.nodeImage?.imageUrl,
                       choices: gameStateResponse.choices.map((c, idx) => ({
                         id: `choice-${idx}`,
                         text: c.text,

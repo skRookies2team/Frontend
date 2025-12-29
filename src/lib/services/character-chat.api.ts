@@ -34,6 +34,15 @@ export class APICharacterChat implements ICharacterChatAPI {
           console.warn(`[API] Character ${character.name} has no chatId, using id instead. This may cause errors.`);
         }
         
+        // 디버깅: 현재 대화하는 캐릭터 정보 로그
+        console.log("[API] RAG Chat Request:", {
+          characterName: character.name,
+          characterId: characterId,
+          chatId: character.chatId,
+          uiId: character.id,
+          userMessage: userQuery || "현재 상황에 대해 조언해주세요."
+        });
+        
         // 백엔드가 히스토리를 관리하므로 프론트엔드에서 전달하지 않음
         // 백엔드가 자동으로 해당 characterId의 히스토리를 가져와서 사용
         const response = await api.game.ragChat({
@@ -41,6 +50,12 @@ export class APICharacterChat implements ICharacterChatAPI {
           userMessage: userQuery || "현재 상황에 대해 조언해주세요.",
           conversationHistory: [], // 백엔드가 히스토리 관리하므로 빈 배열
           maxTokens: 4000
+        });
+        
+        console.log("[API] RAG Chat Response:", {
+          characterId: response.characterId,
+          aiMessage: response.aiMessage?.substring(0, 100) + "...",
+          sourcesCount: response.sources?.length || 0
         });
         
         return response.aiMessage; // 캐릭터 이름은 포함하지 않음 (백엔드에서 처리)

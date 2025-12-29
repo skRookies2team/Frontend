@@ -1,9 +1,11 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
+  import { api, ApiError } from '$lib/api';
   import type { TreeNode } from './story-tree.svelte';
   
   // Props
   let { 
+    storyId = '',
     node = null as TreeNode | null,
     isLoading = false,
     episodeTitle = '',
@@ -16,7 +18,12 @@
   let editedText = $state('');
   let editedChoices = $state<Array<{ text: string; tags: string[] }>>([]);
   let editedImagePrompt = $state('');
+  let editedImageUrl = $state('');
   let hasChanges = $state(false);
+
+  // 이미지 생성 상태
+  let isGeneratingImage = $state(false);
+  let imageGenerationError = $state('');
   
   // 노드가 변경되면 편집 상태 초기화
   $effect(() => {
@@ -24,7 +31,9 @@
       editedText = node.text;
       editedChoices = node.choices ? [...node.choices.map(c => ({ ...c }))] : [];
       editedImagePrompt = node.imagePrompt || '';
+      editedImageUrl = node.imageUrl || '';
       hasChanges = false;
+      imageGenerationError = '';
     }
   });
   
@@ -50,26 +59,28 @@
       hasChanges = false;
       return;
     }
-    
+
     const textChanged = editedText !== node.text;
-    const choicesChanged = editedChoices.some((choice, i) => 
+    const choicesChanged = editedChoices.some((choice, i) =>
       node.choices && node.choices[i] && choice.text !== node.choices[i].text
     );
     const imagePromptChanged = editedImagePrompt !== (node.imagePrompt || '');
-    
-    hasChanges = textChanged || choicesChanged || imagePromptChanged;
+    const imageUrlChanged = editedImageUrl !== (node.imageUrl || '');
+
+    hasChanges = textChanged || choicesChanged || imagePromptChanged || imageUrlChanged;
   }
   
   function handleApply() {
     if (!node || !hasChanges) return;
-    
+
     if (onapplychanges) {
       onapplychanges(new CustomEvent('applychanges', {
         detail: {
           nodeId: node.id,
           newText: editedText,
           newChoices: editedChoices,
-          newImagePrompt: editedImagePrompt
+          newImagePrompt: editedImagePrompt,
+          newImageUrl: editedImageUrl
         }
       }));
     }
@@ -80,10 +91,56 @@
       editedText = node.text;
       editedChoices = node.choices ? [...node.choices.map(c => ({ ...c }))] : [];
       editedImagePrompt = node.imagePrompt || '';
+      editedImageUrl = node.imageUrl || '';
       hasChanges = false;
     }
     if (oncancel) {
       oncancel();
+    }
+  }
+
+  // 이미지 생성 요청
+  async function handleGenerateImage() {
+    if (!editedImagePrompt.trim()) {
+      imageGenerationError = '이미지 프롬프트를 먼저 입력해주세요.';
+      return;
+    }
+    if (!storyId || !node?.id) {
+      imageGenerationError = '스토리 정보가 없어 이미지를 생성할 수 없습니다. (storyId/nodeId 없음)';
+      return;
+    }
+
+    isGeneratingImage = true;
+    imageGenerationError = '';
+
+    try {
+      const response = await api.story.regenerateNodeImage(storyId, node.id, {
+        customPrompt: editedImagePrompt,
+      });
+
+      editedImageUrl = response.imageUrl;
+      // UX: AI가 최적화한 프롬프트도 저장(원하면 사용자가 다시 수정 가능)
+      if (response.enhancedPrompt) {
+        editedImagePrompt = response.enhancedPrompt;
+      }
+      checkChanges();
+
+      console.log('이미지 생성 완료:', editedImageUrl, {
+        storyId: response.storyId,
+        nodeId: response.nodeId,
+        episodeTitle,
+        episodeOrder,
+      });
+
+    } catch (error) {
+      console.error('이미지 생성 실패:', error);
+      if (error instanceof ApiError) {
+        imageGenerationError = error.data?.message || '이미지 생성에 실패했습니다. 다시 시도해주세요.';
+      } else {
+        imageGenerationError = '이미지 생성에 실패했습니다. 다시 시도해주세요.';
+      }
+    } finally {
+      isGeneratingImage = false;
     }
   }
 </script>
@@ -151,14 +208,62 @@
           class="form-textarea image-prompt-textarea"
           value={editedImagePrompt}
           oninput={handleImagePromptChange}
-          disabled={isLoading}
+          disabled={isLoading || isGeneratingImage}
           rows="3"
           placeholder="예: 어둡고 신비로운 숲 속 마법사의 탑, 판타지 스타일, 달빛이 비치는 밤..."
         ></textarea>
-        {#if editedImagePrompt}
-          <p class="form-hint">
-            💡 이 프롬프트는 소설의 전체적인 분위기와 스타일에 맞게 자동으로 조정됩니다.
-          </p>
+
+        <div class="image-actions">
+          <Button
+            onclick={handleGenerateImage}
+            disabled={!editedImagePrompt.trim() || isLoading || isGeneratingImage}
+            variant="outline"
+            class="generate-image-btn"
+          >
+            {#if isGeneratingImage}
+              <span class="btn-spinner"></span>
+              <span>이미지 생성 중...</span>
+            {:else}
+              <span>✨ 이미지 생성</span>
+            {/if}
+          </Button>
+
+          {#if editedImagePrompt}
+            <p class="form-hint inline-hint">
+              💡 백엔드 AI가 프롬프트를 기반으로 이미지를 생성합니다
+            </p>
+          {/if}
+        </div>
+
+        {#if imageGenerationError}
+          <div class="error-message">
+            ⚠️ {imageGenerationError}
+          </div>
+        {/if}
+
+        {#if editedImageUrl}
+          <div class="image-preview">
+            <div class="preview-header">
+              <span class="preview-title">🖼️ 생성된 이미지</span>
+              <button
+                class="remove-image-btn"
+                onclick={() => { editedImageUrl = ''; }}
+                disabled={isLoading || isGeneratingImage}
+              >
+                ✕
+              </button>
+            </div>
+            <div class="preview-image-wrapper">
+              <img
+                src={editedImageUrl}
+                alt="Generated scene"
+                class="preview-image"
+              />
+            </div>
+            <p class="preview-hint">
+              변경사항을 적용하면 이 이미지가 노드에 저장됩니다
+            </p>
+          </div>
         {/if}
       </div>
       
@@ -462,6 +567,120 @@
   .no-selection-hint {
     font-size: 0.875rem;
     color: hsl(var(--muted-foreground));
+  }
+
+  /* 이미지 생성 관련 스타일 */
+  .image-actions {
+    margin-top: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .generate-image-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .inline-hint {
+    margin: 0;
+    flex: 1;
+  }
+
+  .error-message {
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: hsl(0 84.2% 60.2% / 0.1);
+    border: 1px solid hsl(0 84.2% 60.2% / 0.3);
+    border-radius: var(--radius-md);
+    color: hsl(0 84.2% 40%);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .image-preview {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: hsl(var(--muted) / 0.2);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+  }
+
+  .preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+
+  .preview-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: hsl(var(--foreground));
+  }
+
+  .remove-image-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: hsl(var(--destructive) / 0.1);
+    border: 1px solid hsl(var(--destructive) / 0.3);
+    border-radius: var(--radius-sm);
+    color: hsl(var(--destructive));
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+  }
+
+  .remove-image-btn:hover:not(:disabled) {
+    background: hsl(var(--destructive));
+    color: white;
+  }
+
+  .remove-image-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .preview-image-wrapper {
+    position: relative;
+    width: 100%;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: hsl(var(--muted));
+  }
+
+  .preview-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 300px;
+    object-fit: cover;
+  }
+
+  .preview-hint {
+    margin-top: 0.75rem;
+    margin-bottom: 0;
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    text-align: center;
   }
 </style>
 

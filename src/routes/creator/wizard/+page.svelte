@@ -797,26 +797,44 @@
   }
   
   // 노드 수정 적용 (서브트리 재생성) - 백엔드 동기 API 사용
-  async function handleApplyChanges(event: CustomEvent<{ 
-    nodeId: string; 
-    newText: string; 
+  async function handleApplyChanges(event: CustomEvent<{
+    nodeId: string;
+    newText: string;
     newChoices: Array<{ text: string; tags: string[] }>;
     newImagePrompt?: string;
+    newImageUrl?: string;
   }>) {
     if (!selectedNode || !currentEpisodeTree) return;
-    
-    const { nodeId, newText, newChoices, newImagePrompt } = event.detail;
-    
-    regenerating = true;
-    error = '';
-    
+
+    const { nodeId, newText, newChoices, newImagePrompt, newImageUrl } = event.detail;
+
     try {
-      console.log('서브트리 재생성 요청:', { nodeId, newText, newImagePrompt });
-      
+      console.log('서브트리 재생성 요청:', { nodeId, newText, newImagePrompt, newImageUrl });
+
       // 이미지 프롬프트 업데이트 (트리에 직접 반영)
       if (newImagePrompt !== undefined) {
         updateNodeImagePrompt(nodeId, newImagePrompt);
       }
+
+      // 이미지 URL 업데이트 (트리에 직접 반영)
+      if (newImageUrl !== undefined) {
+        updateNodeImageUrl(nodeId, newImageUrl);
+      }
+
+      // 텍스트/선택지 변경이 없으면(이미지 관련만 변경) 서브트리 재생성은 생략
+      const textChanged = newText !== selectedNode.text;
+      const choicesChanged =
+        (selectedNode.choices?.length || 0) !== newChoices.length ||
+        newChoices.some((c, i) => c.text !== (selectedNode.choices?.[i]?.text || ''));
+
+      if (!textChanged && !choicesChanged) {
+        selectedNode = null;
+        alert('✅ 이미지 정보가 업데이트되었습니다.');
+        return;
+      }
+
+      regenerating = true;
+      error = '';
       
       // 백엔드 API를 통한 서브트리 재생성 (동기 방식)
       const response = await api.story.regenerateSubtree(
@@ -836,12 +854,17 @@
       
       // 트리 업데이트 (재생성된 노드들로 교체)
       updateTreeWithRegeneratedNodes(nodeId, response.regeneratedNodes);
-      
+
       // 재생성 후 이미지 프롬프트 다시 설정 (재생성으로 노드가 교체될 수 있음)
       if (newImagePrompt !== undefined) {
         updateNodeImagePrompt(nodeId, newImagePrompt);
       }
-      
+
+      // 재생성 후 이미지 URL 다시 설정 (재생성으로 노드가 교체될 수 있음)
+      if (newImageUrl !== undefined) {
+        updateNodeImageUrl(nodeId, newImageUrl);
+      }
+
       selectedNode = null;
       alert(`✅ 서브트리 재생성 완료! ${response.totalNodesRegenerated}개 노드가 업데이트되었습니다.`);
       
@@ -861,7 +884,7 @@
   // 노드의 이미지 프롬프트 업데이트 (트리 내부)
   function updateNodeImagePrompt(nodeId: string, imagePrompt: string) {
     if (!currentEpisodeTree) return;
-    
+
     function updateNode(node: TreeNode): boolean {
       if (node.id === nodeId) {
         node.imagePrompt = imagePrompt;
@@ -876,12 +899,39 @@
       }
       return false;
     }
-    
+
     updateNode(currentEpisodeTree);
-    
+
     // selectedNode도 업데이트
     if (selectedNode && selectedNode.id === nodeId) {
       selectedNode.imagePrompt = imagePrompt;
+    }
+  }
+
+  // 노드의 이미지 URL 업데이트 (트리 내부)
+  function updateNodeImageUrl(nodeId: string, imageUrl: string) {
+    if (!currentEpisodeTree) return;
+
+    function updateNode(node: TreeNode): boolean {
+      if (node.id === nodeId) {
+        node.imageUrl = imageUrl;
+        return true;
+      }
+      if (node.children) {
+        for (const child of node.children) {
+          if (updateNode(child)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    updateNode(currentEpisodeTree);
+
+    // selectedNode도 업데이트
+    if (selectedNode && selectedNode.id === nodeId) {
+      selectedNode.imageUrl = imageUrl;
     }
   }
   
@@ -1261,6 +1311,7 @@
 
       {:else if currentStep === 5}
         <Step5Tree
+          storyId={storyId}
           treeEditMode={treeEditMode}
           currentEpisodeTree={currentEpisodeTree}
           selectedNode={selectedNode}

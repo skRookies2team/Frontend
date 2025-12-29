@@ -5,6 +5,7 @@
   import type { TreeNode } from '$lib/components/story-tree.svelte';
 
   export let treeEditMode = false;
+  export let storyId = '';
   export let currentEpisodeTree: TreeNode | null = null;
   export let selectedNode: TreeNode | null = null;
   export let regenerating = false;
@@ -18,7 +19,7 @@
   export let error = '';
   export let maxDepth = 3;
   export let onSelectNode: (e: CustomEvent<{ node: TreeNode }>) => void;
-  export let onApplyChanges: (e: CustomEvent<{ nodeId: string; newText: string; newChoices: Array<{ text: string; tags: string[] }>; newImagePrompt?: string;}>) => void;
+  export let onApplyChanges: (e: CustomEvent<{ nodeId: string; newText: string; newChoices: Array<{ text: string; tags: string[] }>; newImagePrompt?: string; newImageUrl?: string; }>) => void;
   export let onCancelSelect: () => void;
   export let onGenerateNextEpisodeFromTree: () => void;
   export let onBackToSettings: () => void;
@@ -84,6 +85,7 @@
           <!-- 노드 편집기 -->
           <div class="editor-panel">
             <NodeEditor 
+              storyId={storyId}
               node={selectedNode}
               isLoading={regenerating}
               episodeTitle={currentEpisodeTitle}

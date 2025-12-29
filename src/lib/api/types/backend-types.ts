@@ -332,6 +332,21 @@ export interface StoryData {
   createdAt: string;
 }
 
+export interface NodeImageDto {
+  imageUrl: string;
+  type: string; // "SCENE" 등
+  fileKey: string;
+  altText: string;
+}
+
+export interface BgmDto {
+  mood: string;
+  filename: string;
+  streamingUrl: string;
+  intensity: number;
+  emotionalTags: string[];
+}
+
 export interface GameStateResponseDto {
   sessionId: string;
   currentEpisodeId: string;
@@ -343,6 +358,8 @@ export interface GameStateResponseDto {
   nodeText: string;
   nodeDetails: StoryNodeDetailDto;
   choices: StoryChoiceDto[];
+  nodeImage?: NodeImageDto;
+  bgm?: BgmDto;
   gaugeDefinitions: GaugeDto[];
   isEpisodeEnd: boolean;
   isGameEnd: boolean;
@@ -376,6 +393,8 @@ export interface EpisodeEndingDto {
   title: string;
   condition: string;
   text: string;
+  imageUrl?: string;
+  imageFileKey?: string;
   gauge_changes: Record<string, number>;
 }
 
@@ -446,6 +465,8 @@ export interface FinalEndingDto {
   title: string;
   condition: string;
   summary: string;
+  imageUrl?: string;
+  imageFileKey?: string;
 }
 
 /**
@@ -580,5 +601,51 @@ export interface RagChatResponseDto {
 export interface HealthCheckResponse {
   status: string;
   [key: string]: any;
+}
+
+// ==================== Image Management ====================
+
+/**
+ * 노드 이미지 정보 조회 응답
+ */
+export interface NodeImageResponseDto {
+  nodeId: string;
+  imageUrl: string;
+  imageFileKey: string;
+}
+
+/**
+ * 이미지 업로드 URL 발급 요청
+ */
+export interface ImageUploadUrlRequestDto {
+  contentType: string; // e.g., image/png, image/jpeg
+}
+
+/**
+ * 이미지 업로드 URL 발급 응답
+ */
+export interface ImageUploadUrlResponseDto {
+  uploadUrl: string; // 파일을 전송할 대상 URL
+  fileKey: string; // 저장될 파일의 고유 키
+  expiresIn: number; // URL 만료 시간(초)
+}
+
+/**
+ * 이미지 AI 재생성 요청
+ */
+export interface ImageRegenerateRequestDto {
+  customPrompt: string; // 이미지 생성을 위한 설명 문구
+}
+
+/**
+ * 이미지 AI 재생성 응답
+ */
+export interface ImageRegenerateResponseDto {
+  imageUrl: string; // 생성된 이미지 경로
+  enhancedPrompt: string; // AI가 최적화한 프롬프트
+  storyId: string;
+  nodeId: string;
+  fileKey: string;
+  generatedAt: string; // 생성 일시
 }
 
