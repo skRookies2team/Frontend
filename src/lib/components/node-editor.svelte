@@ -26,19 +26,66 @@
   let isGeneratingImage = $state(false);
   let imageGenerationError = $state('');
   let imageLoadError = $state(false);
-  
-  // 노드가 변경되면 편집 상태 초기화
+  let isLoadingNodeImage = $state(false);
+
+  // 이미지 업로드 상태
+  let isUploadingImage = $state(false);
+  let uploadProgress = $state(0);
+  let fileInputRef: HTMLInputElement | null = null;
+
+  // 민감한 주제 감지 (AI 생성 실패 시)
+  let isSensitiveContent = $state(false);
+
+  // 노드가 변경되면 편집 상태 초기화 + 이미지 조회
   $effect(() => {
     if (node) {
+      // 기본 정보 초기화
       editedText = node.text;
       editedChoices = node.choices ? [...node.choices.map(c => ({ ...c }))] : [];
       editedImagePrompt = node.imagePrompt || '';
-      editedImageUrl = node.imageUrl || '';
       hasChanges = false;
       imageGenerationError = '';
       imageLoadError = false;
+      isSensitiveContent = false;
+
+      // 백엔드에서 이미지 정보 조회
+      loadNodeImage();
     }
   });
+
+  // 노드 이미지 조회
+  async function loadNodeImage() {
+    if (!storyId || !node?.id) {
+      editedImageUrl = '';
+      return;
+    }
+
+    isLoadingNodeImage = true;
+    imageGenerationError = '';
+
+    try {
+      console.log('[NodeEditor] 노드 이미지 조회:', { storyId, nodeId: node.id });
+
+      const imageInfo = await api.story.getNodeImage(storyId, node.id);
+
+      console.log('[NodeEditor] 노드 이미지 조회 성공:', imageInfo);
+
+      // 이미지 URL 설정
+      if (imageInfo.imageUrl) {
+        editedImageUrl = getAccessibleImageUrl(imageInfo.imageUrl, imageInfo.imageFileKey);
+        console.log('[NodeEditor] 기존 이미지 로드됨:', editedImageUrl);
+      } else {
+        editedImageUrl = '';
+        console.log('[NodeEditor] 이미지 없음');
+      }
+    } catch (error) {
+      console.log('[NodeEditor] 노드 이미지 조회 실패 (이미지가 아직 없을 수 있음):', error);
+      // 이미지가 없는 것은 정상 상황이므로 에러로 표시하지 않음
+      editedImageUrl = '';
+    } finally {
+      isLoadingNodeImage = false;
+    }
+  }
   
   function handleTextChange(e: Event) {
     const target = e.target as HTMLTextAreaElement;
@@ -116,6 +163,7 @@
     isGeneratingImage = true;
     imageGenerationError = '';
     imageLoadError = false;
+    isSensitiveContent = false;
 
     try {
       console.log('[NodeEditor] 이미지 생성 요청 시작:', { storyId, nodeId: node.id, prompt: editedImagePrompt });
@@ -140,10 +188,32 @@
 
     } catch (error) {
       console.error('[NodeEditor] 이미지 생성 실패:', error);
-      if (error instanceof ApiError) {
-        imageGenerationError = error.data?.message || '이미지 생성에 실패했습니다. 다시 시도해주세요.';
+
+      // 민감한 주제 감지
+      const errorMessage = error instanceof ApiError
+        ? (error.data?.message || error.message || '')
+        : String(error);
+
+      const sensitiveKeywords = [
+        'sensitive', 'policy', 'content', 'violation',
+        'inappropriate', 'safety', 'rejected', 'blocked',
+        '민감한', '정책', '위반', '부적절', '거부', '차단'
+      ];
+
+      const isSensitive = sensitiveKeywords.some(keyword =>
+        errorMessage.toLowerCase().includes(keyword.toLowerCase())
+      );
+
+      if (isSensitive) {
+        isSensitiveContent = true;
+        imageGenerationError = '⚠️ 민감한 주제가 포함되어 AI 이미지 생성이 제한되었습니다.';
+        console.warn('[NodeEditor] 민감한 주제 감지:', errorMessage);
       } else {
-        imageGenerationError = '이미지 생성에 실패했습니다. 다시 시도해주세요.';
+        if (error instanceof ApiError) {
+          imageGenerationError = error.data?.message || '이미지 생성에 실패했습니다. 다시 시도해주세요.';
+        } else {
+          imageGenerationError = '이미지 생성에 실패했습니다. 다시 시도해주세요.';
+        }
       }
     } finally {
       isGeneratingImage = false;
@@ -159,6 +229,106 @@
     console.error('[NodeEditor] 이미지 로드 실패:', editedImageUrl);
     imageLoadError = true;
     imageGenerationError = '이미지를 불러올 수 없습니다. URL을 확인하세요: ' + editedImageUrl;
+  }
+
+  // 이미지 직접 업로드
+  function handleFileSelect() {
+    if (fileInputRef) {
+      fileInputRef.click();
+    }
+  }
+
+  async function handleFileChange(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) return;
+
+    // 이미지 파일만 허용
+    if (!file.type.startsWith('image/')) {
+      imageGenerationError = '이미지 파일만 업로드 가능합니다.';
+      return;
+    }
+
+    // 파일 크기 제한 (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      imageGenerationError = '파일 크기는 10MB 이하여야 합니다.';
+      return;
+    }
+
+    if (!storyId || !node?.id) {
+      imageGenerationError = '스토리 정보가 없어 이미지를 업로드할 수 없습니다.';
+      return;
+    }
+
+    isUploadingImage = true;
+    imageGenerationError = '';
+    imageLoadError = false;
+    isSensitiveContent = false;
+    uploadProgress = 0;
+
+    try {
+      console.log('[NodeEditor] 이미지 업로드 시작:', {
+        storyId,
+        nodeId: node.id,
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size
+      });
+
+      // 1. 업로드 URL 발급
+      uploadProgress = 10;
+      const uploadUrlResponse = await api.story.getImageUploadUrl(storyId, node.id, {
+        contentType: file.type
+      });
+
+      console.log('[NodeEditor] 업로드 URL 발급 완료:', uploadUrlResponse);
+
+      // 2. S3에 파일 업로드
+      uploadProgress = 30;
+      const uploadResponse = await fetch(uploadUrlResponse.uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type
+        }
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`S3 업로드 실패: ${uploadResponse.status} ${uploadResponse.statusText}`);
+      }
+
+      console.log('[NodeEditor] S3 업로드 완료');
+      uploadProgress = 70;
+
+      // 3. 업로드된 이미지 정보 조회
+      const imageInfo = await api.story.getNodeImage(storyId, node.id);
+
+      console.log('[NodeEditor] 업로드된 이미지 정보 조회 완료:', imageInfo);
+
+      // 4. 이미지 URL 설정
+      if (imageInfo.imageUrl) {
+        editedImageUrl = getAccessibleImageUrl(imageInfo.imageUrl, imageInfo.imageFileKey);
+        checkChanges();
+        uploadProgress = 100;
+        console.log('[NodeEditor] 이미지 업로드 성공!');
+      }
+
+    } catch (error) {
+      console.error('[NodeEditor] 이미지 업로드 실패:', error);
+      if (error instanceof ApiError) {
+        imageGenerationError = error.data?.message || '이미지 업로드에 실패했습니다.';
+      } else {
+        imageGenerationError = '이미지 업로드에 실패했습니다. 다시 시도해주세요.';
+      }
+    } finally {
+      isUploadingImage = false;
+      uploadProgress = 0;
+      // input 초기화
+      if (input) {
+        input.value = '';
+      }
+    }
   }
 </script>
 
@@ -218,8 +388,8 @@
       <!-- 이미지 프롬프트 편집 -->
       <div class="form-group">
         <label class="form-label">
-          🖼️ 이미지 프롬프트
-          <span class="label-hint">소설 분위기에 맞는 이미지를 위한 프롬프트를 입력하세요</span>
+          🖼️ 노드 이미지
+          <span class="label-hint">AI로 생성하거나 직접 업로드할 수 있습니다</span>
         </label>
         <textarea
           class="form-textarea image-prompt-textarea"
@@ -227,13 +397,14 @@
           oninput={handleImagePromptChange}
           disabled={isLoading || isGeneratingImage}
           rows="3"
-          placeholder="예: 어둡고 신비로운 숲 속 마법사의 탑, 판타지 스타일, 달빛이 비치는 밤..."
+          placeholder="AI 생성을 위한 프롬프트 (선택사항): 어둡고 신비로운 숲 속 마법사의 탑, 판타지 스타일, 달빛이 비치는 밤..."
         ></textarea>
 
         <div class="image-actions">
+          <!-- AI 생성 버튼 -->
           <Button
             onclick={handleGenerateImage}
-            disabled={!editedImagePrompt.trim() || isLoading || isGeneratingImage}
+            disabled={!editedImagePrompt.trim() || isLoading || isGeneratingImage || isUploadingImage}
             variant="outline"
             class="generate-image-btn"
           >
@@ -241,20 +412,69 @@
               <span class="btn-spinner"></span>
               <span>이미지 생성 중...</span>
             {:else}
-              <span>✨ 이미지 생성</span>
+              <span>✨ AI 생성</span>
             {/if}
           </Button>
 
-          {#if editedImagePrompt}
-            <p class="form-hint inline-hint">
-              💡 백엔드 AI가 프롬프트를 기반으로 이미지를 생성합니다
-            </p>
-          {/if}
+          <!-- 직접 업로드 버튼 -->
+          <Button
+            onclick={handleFileSelect}
+            disabled={isLoading || isGeneratingImage || isUploadingImage}
+            variant="outline"
+            class="upload-image-btn {isSensitiveContent ? 'highlighted' : ''}"
+          >
+            {#if isUploadingImage}
+              <span class="btn-spinner"></span>
+              <span>업로드 중... {uploadProgress}%</span>
+            {:else}
+              <span>📁 직접 업로드</span>
+            {/if}
+          </Button>
+
+          <!-- 숨겨진 파일 input -->
+          <input
+            type="file"
+            accept="image/*"
+            bind:this={fileInputRef}
+            onchange={handleFileChange}
+            style="display: none;"
+          />
+
+          <p class="form-hint inline-hint">
+            {#if isUploadingImage}
+              📤 이미지를 업로드하고 있습니다...
+            {:else if isGeneratingImage}
+              ✨ AI가 이미지를 생성하고 있습니다...
+            {:else}
+              💡 프롬프트로 AI 생성하거나, 파일 업로드 (최대 10MB)
+            {/if}
+          </p>
         </div>
 
         {#if imageGenerationError}
-          <div class="error-message">
-            ⚠️ {imageGenerationError}
+          <div class="error-message" class:sensitive-content-error={isSensitiveContent}>
+            {imageGenerationError}
+            {#if isSensitiveContent}
+              <div class="sensitive-content-guide">
+                <p class="guide-text">📁 대신 <strong>직접 업로드</strong> 버튼을 사용하여 이미지를 추가하세요.</p>
+              </div>
+            {/if}
+          </div>
+        {/if}
+
+        {#if isLoadingNodeImage}
+          <div class="loading-message">
+            <span class="btn-spinner"></span>
+            <span>기존 이미지 조회 중...</span>
+          </div>
+        {/if}
+
+        {#if isUploadingImage && uploadProgress > 0}
+          <div class="upload-progress">
+            <div class="progress-bar-container">
+              <div class="progress-bar" style="width: {uploadProgress}%"></div>
+            </div>
+            <span class="progress-text">업로드 중... {uploadProgress}%</span>
           </div>
         {/if}
 
@@ -615,13 +835,44 @@
     margin-top: 0.75rem;
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
 
-  .generate-image-btn {
+  .generate-image-btn,
+  .upload-image-btn {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  /* 민감한 주제일 때 업로드 버튼 강조 */
+  :global(.upload-image-btn.highlighted:not(:disabled)) {
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    border-color: hsl(var(--primary));
+    animation: pulse-highlight 2s ease-in-out infinite;
+    font-weight: 600;
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
+  }
+
+  :global(.upload-image-btn.highlighted:hover:not(:disabled)) {
+    background: hsl(var(--primary) / 0.9);
+    transform: scale(1.05);
+  }
+
+  :global(.upload-image-btn.highlighted:disabled) {
+    animation: none;
+  }
+
+  @keyframes pulse-highlight {
+    0%, 100% {
+      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
+    }
+    50% {
+      box-shadow: 0 0 0 6px hsl(var(--primary) / 0.4);
+    }
   }
 
   .btn-spinner {
@@ -652,6 +903,77 @@
     color: hsl(0 84.2% 40%);
     font-size: 0.875rem;
     font-weight: 500;
+  }
+
+  .error-message.sensitive-content-error {
+    background: hsl(45 100% 50% / 0.15);
+    border: 2px solid hsl(45 100% 50% / 0.5);
+    color: hsl(30 100% 35%);
+    font-weight: 600;
+  }
+
+  .sensitive-content-guide {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid hsl(45 100% 50% / 0.3);
+  }
+
+  .guide-text {
+    margin: 0;
+    font-size: 0.875rem;
+    color: hsl(30 100% 30%);
+    line-height: 1.5;
+  }
+
+  .guide-text strong {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+  }
+
+  .loading-message {
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: hsl(var(--primary) / 0.1);
+    border: 1px solid hsl(var(--primary) / 0.3);
+    border-radius: var(--radius-md);
+    color: hsl(var(--primary));
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .upload-progress {
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: hsl(var(--primary) / 0.05);
+    border: 1px solid hsl(var(--primary) / 0.2);
+    border-radius: var(--radius-md);
+  }
+
+  .progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background: hsl(var(--muted));
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: hsl(var(--primary));
+    border-radius: var(--radius-sm);
+    transition: width 0.3s ease;
+  }
+
+  .progress-text {
+    font-size: 0.75rem;
+    color: hsl(var(--primary));
+    font-weight: 500;
+    display: block;
+    text-align: center;
   }
 
   .image-preview {
@@ -757,6 +1079,25 @@
     background: hsl(var(--background));
     border-radius: var(--radius-sm);
     margin: 0;
+  }
+
+  /* 반응형 */
+  @media (max-width: 768px) {
+    .image-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .generate-image-btn,
+    .upload-image-btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .inline-hint {
+      width: 100%;
+      text-align: center;
+    }
   }
 </style>
 
