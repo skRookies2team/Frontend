@@ -1,5 +1,6 @@
 <script lang="ts">
   import { gsm } from '$lib/stores/game-state-manager.svelte';
+  import { bgmManager } from '$lib/stores/bgm-manager.svelte';
   import { novels } from '$lib/data/novel-configs';
   import { storyGenerator } from '$lib/services/story-generator';
   import { characterChat } from '$lib/services/character-chat';
@@ -10,6 +11,7 @@
   import EpisodeEnding from '$lib/components/episode-ending.svelte';
   import FinalEnding from '$lib/components/final-ending.svelte';
   import EpisodeIntro from '$lib/components/episode-intro.svelte';
+  import BgmControl from '$lib/components/bgm-control.svelte';
   // CharacterDialog 제거 (NPC 설명창 사용 안 함)
   // import CharacterDialog from '$lib/components/character-dialog.svelte';
   import GameMenu from '$lib/components/game-menu.svelte';
@@ -17,7 +19,7 @@
   import { api, type StoryData } from '$lib/api';
   import type { Character, NovelConfig } from '$lib/types/game-state';
   import type { EpisodeEndingDto, FinalEndingDto, GaugeDto, EndingResponseDto } from '$lib/api/types/backend-types';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
   
   const novelId = $derived($page.params.novel_id);
@@ -207,6 +209,11 @@
         gsm.setScene(apiScene);
         useApiGame = true;
         gameInitialized = true;
+
+        // BGM 재생
+        if (gameStateResponse.bgm && gameStateResponse.currentEpisodeId) {
+          bgmManager.play(gameStateResponse.bgm, gameStateResponse.currentEpisodeId);
+        }
       } catch (err) {
         console.error('Failed to load story from API:', err);
         alert('게임을 불러오는데 실패했습니다.');
@@ -217,7 +224,13 @@
     
     loading = false;
   });
-  
+
+  // 페이지 떠날 때 BGM 정리
+  onDestroy(() => {
+    bgmManager.stop();
+    console.log('[Play] 페이지를 떠나면서 BGM 중지');
+  });
+
   async function handleChoiceSelect(choiceId: string) {
     if (!gameState.currentScene || !novelConfig) return;
     
@@ -266,8 +279,13 @@
                   }
                 });
               }
-              
+
               gsm.setScene(nextScene);
+
+              // BGM 재생 (새 에피소드)
+              if (gameStateResponse.bgm && gameStateResponse.currentEpisodeId) {
+                bgmManager.play(gameStateResponse.bgm, gameStateResponse.currentEpisodeId);
+              }
               saveGameState(gsm.currentState);
               loading = false;
               return;
@@ -423,8 +441,13 @@
               immediateReaction: c.immediateReaction
             }))
           };
-          
+
           gsm.setScene(nextScene);
+
+          // BGM 재생 (같은 에피소드 내에서는 계속 재생)
+          if (gameStateResponse.bgm && gameStateResponse.currentEpisodeId) {
+            bgmManager.play(gameStateResponse.bgm, gameStateResponse.currentEpisodeId);
+          }
           saveGameState(gsm.currentState);
         } catch (err) {
           console.error('Failed to make choice:', err);
@@ -624,8 +647,13 @@
                         }
                       });
                     }
-                    
+
                     gsm.setScene(nextScene);
+
+                    // BGM 재생 (같은 에피소드 내에서는 계속 재생)
+                    if (gameStateResponse.bgm && gameStateResponse.currentEpisodeId) {
+                      bgmManager.play(gameStateResponse.bgm, gameStateResponse.currentEpisodeId);
+                    }
                     saveGameState(gsm.currentState);
                   } catch (err) {
                     console.error('Failed to continue to next episode:', err);
@@ -836,6 +864,13 @@
       onSave={handleSave}
       onRestart={handleRestart}
     />
+  {/if}
+
+  <!-- BGM 컨트롤 (우측 하단 고정) -->
+  {#if gameInitialized && bgmManager.currentBgm}
+    <div class="bgm-control-container">
+      <BgmControl />
+    </div>
   {/if}
 {/if}
 
@@ -1466,6 +1501,34 @@
     background-clip: text;
     position: relative;
     z-index: 1;
+  }
+
+  /* BGM 컨트롤 */
+  .bgm-control-container {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 50;
+    animation: slideInFromBottom 0.5s ease;
+  }
+
+  @keyframes slideInFromBottom {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .bgm-control-container {
+      bottom: 1rem;
+      right: 1rem;
+      left: 1rem;
+    }
   }
 </style>
 

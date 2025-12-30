@@ -343,11 +343,10 @@ export interface NodeImageDto {
 }
 
 export interface BgmDto {
+  id: number;
   mood: string;
   filename: string;
   streamingUrl: string;
-  intensity: number;
-  emotionalTags: string[];
 }
 
 export interface GameStateResponseDto {
