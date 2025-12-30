@@ -327,8 +327,11 @@ export interface StoryData {
   description: string;
   genre?: string;
   storyJson: string;
+  storyFileKey: string;
   totalEpisodes: number;
   totalNodes: number;
+  thumbnailUrl: string;
+  thumbnailFileKey: string;
   createdAt: string;
 }
 

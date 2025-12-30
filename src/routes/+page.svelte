@@ -204,7 +204,7 @@
               {#each filteredStories as story}
                 <div class="netflix-card" onclick={() => startStory(story)}>
                   <div class="netflix-card-image">
-                    <img src="/placeholder.svg" alt={story.title} />
+                    <img src={story.thumbnailUrl} alt={story.title} />
                     {#if Math.random() > 0.7}
                       <div class="top10-badge">TOP 10</div>
                     {/if}
