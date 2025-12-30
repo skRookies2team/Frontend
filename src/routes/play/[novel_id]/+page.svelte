@@ -4,6 +4,7 @@
   import { storyGenerator } from '$lib/services/story-generator';
   import { characterChat } from '$lib/services/character-chat';
   import { saveGameState, loadGameState, clearGameState, hasSavedGame } from '$lib/utils/storage';
+  import { getAccessibleImageUrl } from '$lib/utils/image-url';
   import CharacterPanel from '$lib/components/character-panel.svelte';
   import StoryScene from '$lib/components/story-scene.svelte';
   import EpisodeEnding from '$lib/components/episode-ending.svelte';
@@ -192,7 +193,9 @@
         const apiScene = {
           id: gameStateResponse.currentNodeId,
           story: gameStateResponse.nodeText,
-          imageUrl: gameStateResponse.nodeImage?.imageUrl,
+          imageUrl: gameStateResponse.nodeImage?.imageUrl
+            ? getAccessibleImageUrl(gameStateResponse.nodeImage.imageUrl, gameStateResponse.nodeImage.fileKey)
+            : undefined,
           choices: gameStateResponse.choices.map((c, idx) => ({
             id: `choice-${idx}`,
             text: c.text,
@@ -244,7 +247,9 @@
               const nextScene = {
                 id: gameStateResponse.currentNodeId,
                 story: gameStateResponse.nodeText,
-                imageUrl: gameStateResponse.nodeImage?.imageUrl,
+                imageUrl: gameStateResponse.nodeImage?.imageUrl
+                  ? getAccessibleImageUrl(gameStateResponse.nodeImage.imageUrl, gameStateResponse.nodeImage.fileKey)
+                  : undefined,
                 choices: gameStateResponse.choices.map((c, idx) => ({
                   id: `choice-${idx}`,
                   text: c.text,
@@ -408,7 +413,9 @@
           const nextScene = {
             id: gameStateResponse.currentNodeId,
             story: gameStateResponse.nodeText,
-            imageUrl: gameStateResponse.nodeImage?.imageUrl,
+            imageUrl: gameStateResponse.nodeImage?.imageUrl
+              ? getAccessibleImageUrl(gameStateResponse.nodeImage.imageUrl, gameStateResponse.nodeImage.fileKey)
+              : undefined,
             choices: gameStateResponse.choices.map((c, idx) => ({
               id: `choice-${idx}`,
               text: c.text,
@@ -599,7 +606,9 @@
                     const nextScene = {
                       id: gameStateResponse.currentNodeId,
                       story: gameStateResponse.nodeText,
-                      imageUrl: gameStateResponse.nodeImage?.imageUrl,
+                      imageUrl: gameStateResponse.nodeImage?.imageUrl
+                        ? getAccessibleImageUrl(gameStateResponse.nodeImage.imageUrl, gameStateResponse.nodeImage.fileKey)
+                        : undefined,
                       choices: gameStateResponse.choices.map((c, idx) => ({
                         id: `choice-${idx}`,
                         text: c.text,

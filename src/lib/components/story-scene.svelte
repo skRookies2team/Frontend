@@ -33,26 +33,23 @@
 </script>
 
 <div class="story-scene">
-  {#if scene.imageUrl}
-    <div class="story-background" class:loaded={imageLoaded}>
-      <img 
-        src={scene.imageUrl || "/placeholder.svg"} 
-        alt="Scene background"
-        onload={handleImageLoad}
-      />
-      <div class="story-overlay"></div>
-    </div>
-  {:else}
-    <div class="story-background-gradient">
-      <div class="story-overlay"></div>
-    </div>
-  {/if}
-  
   <div class="story-content">
     <div class="story-text-container">
       <p class="story-text">{scene.story}</p>
     </div>
-    
+
+    {#if scene.imageUrl}
+      <div class="scene-image-container">
+        <img
+          src={scene.imageUrl}
+          alt="Scene illustration"
+          class="scene-image"
+          class:loaded={imageLoaded}
+          onload={handleImageLoad}
+        />
+      </div>
+    {/if}
+
     {#if scene.characterEvents && scene.characterEvents.length > 0}
       <div class="character-events">
         {#each scene.characterEvents as event}
@@ -63,12 +60,12 @@
         {/each}
       </div>
     {/if}
-    
+
     <div class="choices-container">
       <p class="choices-label">선택하세요:</p>
       <div class="choices-grid">
         {#each scene.choices as choice, index}
-          <Button 
+          <Button
             class="choice-button {selectedChoice === choice.id ? 'selected' : ''}"
             size="lg"
             disabled={selectedChoice !== null}
@@ -85,8 +82,6 @@
 
 <style>
   .story-scene {
-    position: relative;
-    min-height: 600px;
     border-radius: var(--radius-xl);
     overflow: hidden;
     background: linear-gradient(135deg, hsl(240 12% 12%), hsl(240 12% 10%));
@@ -94,17 +89,7 @@
     box-shadow: var(--glow-card);
     animation: fadeIn 0.6s ease;
   }
-  
-  .story-scene::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: var(--radius-xl);
-    background: linear-gradient(135deg, hsla(0 90% 48% / 0.08), transparent);
-    pointer-events: none;
-    z-index: 1;
-  }
-  
+
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -113,67 +98,49 @@
       opacity: 1;
     }
   }
-  
-  .story-background {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    opacity: 0;
-    transition: opacity 0.8s ease;
-  }
-  
-  .story-background.loaded {
-    opacity: 1;
-  }
-  
-  .story-background img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  
-  .story-background-gradient {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, hsl(220 20% 15%) 0%, hsl(220 20% 10%) 100%);
-  }
-  
-  .story-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--story-overlay);
-  }
-  
+
   .story-content {
-    position: relative;
     padding: 3rem;
     display: flex;
     flex-direction: column;
     gap: 2rem;
-    min-height: 600px;
   }
-  
+
   .story-text-container {
-    flex: 1;
+    margin-bottom: 0.5rem;
   }
-  
+
   .story-text {
     font-size: 1.25rem;
     line-height: 1.9;
     color: hsl(0 0% 95%);
-    max-width: 700px;
     white-space: pre-line;
-    text-shadow: 0 2px 8px hsla(0 0% 0% / 0.5);
     font-weight: 400;
     letter-spacing: 0.01em;
+  }
+
+  .scene-image-container {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: hsl(var(--muted) / 0.3);
+    box-shadow: 0 8px 32px hsla(0 0% 0% / 0.4);
+  }
+
+  .scene-image {
+    width: 100%;
+    height: auto;
+    max-height: 500px;
+    object-fit: cover;
+    display: block;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+
+  .scene-image.loaded {
+    opacity: 1;
   }
   
   .character-events {
@@ -276,5 +243,21 @@
   :global(.choice-button:disabled) {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  /* 반응형 */
+  @media (max-width: 768px) {
+    .story-content {
+      padding: 2rem 1.5rem;
+      gap: 1.5rem;
+    }
+
+    .story-text {
+      font-size: 1.125rem;
+    }
+
+    .scene-image {
+      max-height: 350px;
+    }
   }
 </style>

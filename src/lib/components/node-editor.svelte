@@ -2,6 +2,7 @@
   import { Button } from '$lib/components/ui/button';
   import { api, ApiError } from '$lib/api';
   import type { TreeNode } from './story-tree.svelte';
+  import { getAccessibleImageUrl } from '$lib/utils/image-url';
   
   // Props
   let { 
@@ -24,6 +25,7 @@
   // 이미지 생성 상태
   let isGeneratingImage = $state(false);
   let imageGenerationError = $state('');
+  let imageLoadError = $state(false);
   
   // 노드가 변경되면 편집 상태 초기화
   $effect(() => {
@@ -34,6 +36,7 @@
       editedImageUrl = node.imageUrl || '';
       hasChanges = false;
       imageGenerationError = '';
+      imageLoadError = false;
     }
   });
   
@@ -112,28 +115,31 @@
 
     isGeneratingImage = true;
     imageGenerationError = '';
+    imageLoadError = false;
 
     try {
+      console.log('[NodeEditor] 이미지 생성 요청 시작:', { storyId, nodeId: node.id, prompt: editedImagePrompt });
+
       const response = await api.story.regenerateNodeImage(storyId, node.id, {
         customPrompt: editedImagePrompt,
       });
 
-      editedImageUrl = response.imageUrl;
+      console.log('[NodeEditor] 이미지 생성 응답:', response);
+      console.log('[NodeEditor] 받은 이미지 URL:', response.imageUrl);
+      console.log('[NodeEditor] 받은 파일 키:', response.fileKey);
+
+      // S3 URL을 CloudFront URL로 변환 (Access Denied 방지)
+      editedImageUrl = getAccessibleImageUrl(response.imageUrl, response.fileKey);
       // UX: AI가 최적화한 프롬프트도 저장(원하면 사용자가 다시 수정 가능)
       if (response.enhancedPrompt) {
         editedImagePrompt = response.enhancedPrompt;
       }
       checkChanges();
 
-      console.log('이미지 생성 완료:', editedImageUrl, {
-        storyId: response.storyId,
-        nodeId: response.nodeId,
-        episodeTitle,
-        episodeOrder,
-      });
+      console.log('[NodeEditor] 이미지 생성 완료! editedImageUrl이 설정됨:', editedImageUrl);
 
     } catch (error) {
-      console.error('이미지 생성 실패:', error);
+      console.error('[NodeEditor] 이미지 생성 실패:', error);
       if (error instanceof ApiError) {
         imageGenerationError = error.data?.message || '이미지 생성에 실패했습니다. 다시 시도해주세요.';
       } else {
@@ -142,6 +148,17 @@
     } finally {
       isGeneratingImage = false;
     }
+  }
+
+  function handleImageLoad() {
+    console.log('[NodeEditor] 이미지 로드 성공:', editedImageUrl);
+    imageLoadError = false;
+  }
+
+  function handleImageError() {
+    console.error('[NodeEditor] 이미지 로드 실패:', editedImageUrl);
+    imageLoadError = true;
+    imageGenerationError = '이미지를 불러올 수 없습니다. URL을 확인하세요: ' + editedImageUrl;
   }
 </script>
 
@@ -247,21 +264,45 @@
               <span class="preview-title">🖼️ 생성된 이미지</span>
               <button
                 class="remove-image-btn"
-                onclick={() => { editedImageUrl = ''; }}
+                onclick={() => {
+                  editedImageUrl = '';
+                  imageLoadError = false;
+                }}
                 disabled={isLoading || isGeneratingImage}
               >
                 ✕
               </button>
             </div>
             <div class="preview-image-wrapper">
-              <img
-                src={editedImageUrl}
-                alt="Generated scene"
-                class="preview-image"
-              />
+              {#if imageLoadError}
+                <div class="image-load-error">
+                  <p class="error-icon">⚠️</p>
+                  <p class="error-text">이미지를 불러올 수 없습니다</p>
+                  <p class="error-url">{editedImageUrl}</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onclick={() => { imageLoadError = false; }}
+                  >
+                    다시 시도
+                  </Button>
+                </div>
+              {:else}
+                <img
+                  src={editedImageUrl}
+                  alt="Generated scene"
+                  class="preview-image"
+                  onload={handleImageLoad}
+                  onerror={handleImageError}
+                />
+              {/if}
             </div>
             <p class="preview-hint">
-              변경사항을 적용하면 이 이미지가 노드에 저장됩니다
+              {#if imageLoadError}
+                이미지 URL을 확인하거나 다시 생성해주세요
+              {:else}
+                변경사항을 적용하면 이 이미지가 노드에 저장됩니다
+              {/if}
             </p>
           </div>
         {/if}
@@ -681,6 +722,41 @@
     font-size: 0.75rem;
     color: hsl(var(--muted-foreground));
     text-align: center;
+  }
+
+  .image-load-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: hsl(var(--muted) / 0.5);
+    min-height: 200px;
+    text-align: center;
+    gap: 0.75rem;
+  }
+
+  .image-load-error .error-icon {
+    font-size: 2.5rem;
+    margin: 0;
+  }
+
+  .image-load-error .error-text {
+    font-weight: 600;
+    color: hsl(var(--destructive));
+    margin: 0;
+  }
+
+  .image-load-error .error-url {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    font-family: monospace;
+    word-break: break-all;
+    max-width: 100%;
+    padding: 0.5rem;
+    background: hsl(var(--background));
+    border-radius: var(--radius-sm);
+    margin: 0;
   }
 </style>
 

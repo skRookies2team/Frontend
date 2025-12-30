@@ -151,24 +151,24 @@ function loadConfig(): AppConfig {
 
   return {
     apiMode,
-    
+
     backend: {
       baseUrl,
       relayUrl,
     },
-    
+
     llm: {
       provider: ((env.PUBLIC_LLM_PROVIDER as string) || 'openai') as LLMProvider,
       apiKey: ((env.PUBLIC_OPENAI_API_KEY as string) || (env.PUBLIC_ANTHROPIC_API_KEY as string) || ''),
       model: ((env.PUBLIC_OPENAI_MODEL as string) || (env.PUBLIC_ANTHROPIC_MODEL as string) || 'gpt-4-turbo-preview'),
     },
-    
+
     image: {
       provider: ((env.PUBLIC_IMAGE_API_PROVIDER as string) || 'backend') as ImageProvider,
       apiKey: (env.PUBLIC_IMAGE_API_KEY as string) || '',
       model: (env.PUBLIC_IMAGE_MODEL as string) || 'dall-e-3',
     },
-    
+
     storage: {
       type: ((env.PUBLIC_STORAGE_TYPE as string) || 'localStorage') as StorageType,
     },
