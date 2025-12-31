@@ -1,7 +1,7 @@
 import type { GameState, SceneData, Choice, NovelConfig } from "$lib/types/game-state"
 
 class GameStateManager {
-  currentState = {
+  currentState: GameState = {
     currentNovel: "",
     act: 1,
     scene: 1,
@@ -14,7 +14,7 @@ class GameStateManager {
     lastUpdate: Date.now(),
   }
 
-  novelConfig = null
+  novelConfig: NovelConfig | null = null
 
   // Initialize game with novel config
   initializeGame(novelConfig: NovelConfig) {

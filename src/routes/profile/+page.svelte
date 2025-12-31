@@ -10,107 +10,7 @@
   let gameHistory: GameHistoryDto[] = $state([]);
   let achievements: AchievementDto[] = $state([]);
   let error = $state('');
-  
-  // 목업 업적 데이터 (실제 API가 준비되면 제거)
-  const mockAchievements: AchievementDto[] = [
-    {
-      achievementId: 1,
-      code: 'FIRST_STORY',
-      name: '첫 걸음',
-      description: '첫 번째 스토리를 플레이하세요',
-      type: 'PLAY_COUNT',
-      targetValue: 1,
-      currentValue: 0,
-      iconUrl: '',
-      points: 10,
-      isUnlocked: false
-    },
-    {
-      achievementId: 2,
-      code: 'STORY_MASTER',
-      name: '스토리 마스터',
-      description: '10개의 스토리를 플레이하세요',
-      type: 'PLAY_COUNT',
-      targetValue: 10,
-      currentValue: 0,
-      iconUrl: '',
-      points: 50,
-      isUnlocked: false
-    },
-    {
-      achievementId: 3,
-      code: 'COMPLETIONIST',
-      name: '완벽주의자',
-      description: '5개의 스토리를 완주하세요',
-      type: 'COMPLETION_COUNT',
-      targetValue: 5,
-      currentValue: 0,
-      iconUrl: '',
-      points: 100,
-      isUnlocked: false
-    },
-    {
-      achievementId: 4,
-      code: 'ENDING_COLLECTOR',
-      name: '엔딩 수집가',
-      description: '20개의 엔딩을 달성하세요',
-      type: 'ENDING_COUNT',
-      targetValue: 20,
-      currentValue: 0,
-      iconUrl: '',
-      points: 150,
-      isUnlocked: false
-    },
-    {
-      achievementId: 5,
-      code: 'CREATOR',
-      name: '창작자',
-      description: '첫 번째 스토리를 생성하세요',
-      type: 'CREATION_COUNT',
-      targetValue: 1,
-      currentValue: 0,
-      iconUrl: '',
-      points: 30,
-      isUnlocked: false
-    },
-    {
-      achievementId: 6,
-      code: 'PROLIFIC_CREATOR',
-      name: '다작 작가',
-      description: '5개의 스토리를 생성하세요',
-      type: 'CREATION_COUNT',
-      targetValue: 5,
-      currentValue: 0,
-      iconUrl: '',
-      points: 200,
-      isUnlocked: false
-    },
-    {
-      achievementId: 7,
-      code: 'SOCIAL_BUTTERFLY',
-      name: '사교적',
-      description: '커뮤니티에 10개의 게시글을 작성하세요',
-      type: 'POST_COUNT',
-      targetValue: 10,
-      currentValue: 0,
-      iconUrl: '',
-      points: 80,
-      isUnlocked: false
-    },
-    {
-      achievementId: 8,
-      code: 'PERFECTIONIST',
-      name: '완벽주의',
-      description: '모든 업적을 달성하세요',
-      type: 'ACHIEVEMENT_COUNT',
-      targetValue: 7,
-      currentValue: 0,
-      iconUrl: '',
-      points: 500,
-      isUnlocked: false
-    }
-  ];
-  
+
   onMount(async () => {
     // Check if user is authenticated
     if (!api.auth.isAuthenticated()) {
@@ -123,63 +23,15 @@
       const [profileData, historyData, achievementsData] = await Promise.all([
         api.user.getMyProfile(),
         api.user.getGameHistory(),
-        api.user.getAchievements().catch(() => []) // API 실패 시 빈 배열 반환
+        api.user.getAchievements()
       ]);
-      
+
       profile = profileData;
       gameHistory = historyData;
-      
-      // 업적 데이터가 없거나 비어있으면 목업 데이터 사용
-      if (!achievementsData || achievementsData.length === 0) {
-        // 프로필 데이터를 기반으로 현재 진행 상태 업데이트
-        achievements = mockAchievements.map(achievement => {
-          let currentValue = 0;
-          let isUnlocked = false;
-          
-          switch (achievement.type) {
-            case 'PLAY_COUNT':
-              currentValue = profileData?.totalPlayCount || 0;
-              isUnlocked = currentValue >= achievement.targetValue;
-              break;
-            case 'COMPLETION_COUNT':
-              currentValue = profileData?.completedStoryCount || 0;
-              isUnlocked = currentValue >= achievement.targetValue;
-              break;
-            case 'ENDING_COUNT':
-              currentValue = profileData?.unlockedEndingCount || 0;
-              isUnlocked = currentValue >= achievement.targetValue;
-              break;
-            case 'CREATION_COUNT':
-              // TODO: 생성한 스토리 수 (현재 API에 없음)
-              currentValue = 0;
-              isUnlocked = currentValue >= achievement.targetValue;
-              break;
-            case 'POST_COUNT':
-              // TODO: 게시글 수 (현재 API에 없음)
-              currentValue = 0;
-              isUnlocked = currentValue >= achievement.targetValue;
-              break;
-            case 'ACHIEVEMENT_COUNT':
-              currentValue = profileData?.unlockedAchievementCount || 0;
-              isUnlocked = currentValue >= achievement.targetValue;
-              break;
-          }
-          
-          return {
-            ...achievement,
-            currentValue,
-            isUnlocked,
-            unlockedAt: isUnlocked ? new Date().toISOString() : undefined
-          };
-        });
-      } else {
-        achievements = achievementsData;
-      }
+      achievements = achievementsData;
     } catch (err) {
       console.error('Failed to load profile:', err);
       error = '프로필을 불러오는데 실패했습니다.';
-      // 에러 발생 시에도 목업 데이터 사용
-      achievements = mockAchievements;
     } finally {
       loading = false;
     }

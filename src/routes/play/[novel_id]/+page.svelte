@@ -502,8 +502,7 @@
       const responseText = await characterChat.getCharacterResponse(
         selectedCharacter.character,
         gsm.currentState,
-        userMessage,
-        [] // 백엔드가 히스토리 관리하므로 빈 배열 전달
+        userMessage
       );
       
       console.log('[DEBUG] RAG 서버 응답 받음:', responseText);
@@ -707,11 +706,7 @@
                       onclick={() => handleNpcSelect(character)}
                       aria-label={`${character.name} 선택`}
                     >
-                      <CharacterPanel 
-                        {character}
-                        trustLevel={gameState.trust[character.id] || 0}
-                        relationship={gameState.relationships[character.id] || 0}
-                      />
+                      <CharacterPanel {character} />
                     </button>
                   {/each}
                 </div>
