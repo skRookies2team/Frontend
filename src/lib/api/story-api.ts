@@ -28,6 +28,9 @@ import type {
   ImageUploadUrlResponseDto,
   ImageRegenerateRequestDto,
   ImageRegenerateResponseDto,
+  ThumbnailResponseDto,
+  ThumbnailUpdateRequestDto,
+  ThumbnailUpdateResponseDto,
 } from './types/backend-types';
 
 export class StoryApi {
@@ -209,6 +212,35 @@ export class StoryApi {
   ): Promise<ImageRegenerateResponseDto> {
     return httpClient.post<ImageRegenerateResponseDto>(
       `/api/stories/${storyId}/images/nodes/${nodeId}/regenerate`,
+      data
+    );
+  }
+
+  // ==================== Thumbnail Management ====================
+
+  /**
+   * 썸네일 조회
+   * 스토리에 등록된 썸네일 정보를 가져옵니다
+   */
+  async getThumbnail(storyId: string): Promise<ThumbnailResponseDto> {
+    return httpClient.get<ThumbnailResponseDto>(`/api/stories/${storyId}/thumbnail`);
+  }
+
+  /**
+   * 썸네일 업로드/교체
+   * 새로운 이미지를 썸네일로 등록하거나 기존 이미지를 교체합니다
+   *
+   * 사용 방법:
+   * 1. uploadApi.getImagePresignedUrl()로 Presigned URL 발급
+   * 2. httpClient.uploadToS3()로 S3에 파일 업로드
+   * 3. 이 메서드에 fileKey 전달하여 썸네일 등록
+   */
+  async updateThumbnail(
+    storyId: string,
+    data: ThumbnailUpdateRequestDto
+  ): Promise<ThumbnailUpdateResponseDto> {
+    return httpClient.put<ThumbnailUpdateResponseDto>(
+      `/api/stories/${storyId}/thumbnail`,
       data
     );
   }

@@ -651,3 +651,28 @@ export interface ImageRegenerateResponseDto {
   generatedAt: string; // 생성 일시
 }
 
+// ==================== Thumbnail Management ====================
+
+/**
+ * 썸네일 조회 응답
+ */
+export interface ThumbnailResponseDto {
+  thumbnailUrl: string; // 이미지의 실제 경로 URL
+  hasAiGenerated: boolean; // AI에 의해 생성된 이미지인지 여부
+}
+
+/**
+ * 썸네일 업로드/교체 요청
+ */
+export interface ThumbnailUpdateRequestDto {
+  thumbnailFileKey: string; // S3에 업로드된 파일의 키 값
+}
+
+/**
+ * 썸네일 업로드/교체 응답
+ */
+export interface ThumbnailUpdateResponseDto {
+  thumbnailUrl: string;
+  message: string;
+}
+

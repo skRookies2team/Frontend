@@ -31,6 +31,12 @@
   let selectedCharacterNames = $state<string[]>([]);
   let loadingAnalysis = $state(false);
   let selectingCharacters = $state(false);
+
+  // 2단계: 썸네일
+  let thumbnailUrl = $state('');
+  let thumbnailLoading = $state(false);
+  let thumbnailUploading = $state(false);
+  let hasAiGenerated = $state(false);
   
   // 3단계: 게이지 선택 (5개 → 2개 선택)
   let proposedGauges = $state<GaugeDto[]>([]);
@@ -100,7 +106,10 @@
         // 트리 편집 관련 상태 추가
         treeEditMode,
         currentEpisodeTree: currentEpisodeTree ? JSON.parse(JSON.stringify(currentEpisodeTree)) : null,
-        proposedGauges: proposedGauges.map(g => ({ ...g }))
+        proposedGauges: proposedGauges.map(g => ({ ...g })),
+        // 썸네일 상태 추가
+        thumbnailUrl,
+        hasAiGenerated
       };
       // sessionStorage: F5 새로고침 시 유지, 탭/브라우저 닫으면 초기화
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -139,6 +148,9 @@
       if (state.treeEditMode !== undefined) treeEditMode = state.treeEditMode;
       if (state.currentEpisodeTree) currentEpisodeTree = state.currentEpisodeTree;
       if (state.proposedGauges) proposedGauges = state.proposedGauges;
+      // 썸네일 상태 복원
+      if (state.thumbnailUrl) thumbnailUrl = state.thumbnailUrl;
+      if (state.hasAiGenerated !== undefined) hasAiGenerated = state.hasAiGenerated;
     } catch (err) {
       console.warn('상태 복원 실패:', err);
     }
@@ -186,10 +198,15 @@
     
     // 기존 localStorage의 wizard-state 삭제 (마이그레이션)
     localStorage.removeItem(STORAGE_KEY);
-    
+
     // 상태 복원 (sessionStorage에서)
     restoreState();
-    
+
+    // 상태 복원 후 storyId가 있고 2단계 이상이면 썸네일 조회
+    if (storyId && currentStep >= 2 && !thumbnailUrl) {
+      loadThumbnail();
+    }
+
     // 페이지 언로드 시 상태 저장
     const handleBeforeUnload = () => {
       saveState();
@@ -370,22 +387,25 @@
   // 2단계: 분석 데이터 로드 (폴링)
   async function loadAnalysisData() {
     loadingAnalysis = true;
-    
+
     try {
       // 진행률 폴링: CHARACTERS_READY가 될 때까지
       const checkProgress = async (): Promise<void> => {
         const progressData = await api.story.getProgress(storyId);
-        
+
         if (progressData.status === 'CHARACTERS_READY' || progressData.status === 'GAUGES_READY') {
           // 요약과 캐릭터 로드
           const [summaryData, charactersData] = await Promise.all([
             api.story.getSummary(storyId),
             api.story.getCharacters(storyId)
           ]);
-          
+
           summary = summaryData.summary;
           characters = charactersData.characters;
           loadingAnalysis = false;
+
+          // 썸네일 조회 (분석 완료 후 비동기로 조회)
+          loadThumbnail();
         } else if (progressData.status === 'FAILED') {
           const errorMsg = progressData.progress?.error || '분석에 실패했습니다';
           console.error('분석 실패 상세:', progressData);
@@ -395,13 +415,74 @@
           setTimeout(() => checkProgress(), 3000);
         }
       };
-      
+
       await checkProgress();
     } catch (err: any) {
       console.error('분석 데이터 로드 실패:', err);
       error = err.message || '분석에 실패했습니다.';
       loadingAnalysis = false;
     }
+  }
+
+  // 2단계: 썸네일 조회
+  async function loadThumbnail() {
+    thumbnailLoading = true;
+    try {
+      const response = await api.story.getThumbnail(storyId);
+      thumbnailUrl = response.thumbnailUrl || '';
+      hasAiGenerated = response.hasAiGenerated || false;
+    } catch (err: any) {
+      // 썸네일이 없는 경우는 에러로 처리하지 않음
+      console.log('썸네일 조회:', err.message || '썸네일 없음');
+      thumbnailUrl = '';
+      hasAiGenerated = false;
+    } finally {
+      thumbnailLoading = false;
+    }
+  }
+
+  // 2단계: 썸네일 업로드
+  async function handleThumbnailUpload(file: File) {
+    thumbnailUploading = true;
+    error = '';
+
+    try {
+      // 1. Presigned URL 발급
+      const { uploadUrl, fileKey } = await api.upload.getImagePresignedUrl(
+        file.name,
+        file.size
+      );
+
+      // 2. S3에 파일 업로드
+      const httpClient = (await import('$lib/api/http-client')).httpClient;
+      await httpClient.uploadToS3(uploadUrl, file);
+
+      // 3. 백엔드에 썸네일 등록
+      const response = await api.story.updateThumbnail(storyId, {
+        thumbnailFileKey: fileKey
+      });
+
+      // 4. 상태 업데이트
+      thumbnailUrl = response.thumbnailUrl;
+      hasAiGenerated = false; // 사용자 업로드이므로 false
+      console.log('썸네일 업로드 성공:', response.message);
+    } catch (err: any) {
+      console.error('썸네일 업로드 실패:', err);
+      if (err instanceof ApiError) {
+        error = err.data?.message || '썸네일 업로드에 실패했습니다.';
+      } else {
+        error = '썸네일 업로드 중 오류가 발생했습니다.';
+      }
+      alert('썸네일 업로드 실패: ' + error);
+    } finally {
+      thumbnailUploading = false;
+    }
+  }
+
+  // 2단계: 썸네일 삭제 (빈 이미지로 설정)
+  function handleThumbnailRemove() {
+    thumbnailUrl = '';
+    hasAiGenerated = false;
   }
   
   async function nextStep() {
@@ -1244,6 +1325,12 @@
           characters={characters}
           selectedCharacterNames={selectedCharacterNames}
           selectingCharacters={selectingCharacters}
+          thumbnailUrl={thumbnailUrl}
+          thumbnailLoading={thumbnailLoading}
+          thumbnailUploading={thumbnailUploading}
+          hasAiGenerated={hasAiGenerated}
+          onThumbnailUpload={handleThumbnailUpload}
+          onThumbnailRemove={handleThumbnailRemove}
         >
           {#each characters as character}
             <div class="character-card-wrapper">
