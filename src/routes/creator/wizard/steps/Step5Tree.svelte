@@ -2,7 +2,7 @@
   import { Button } from '$lib/components/ui/button';
   import StoryTree from '$lib/components/story-tree.svelte';
   import NodeEditor from '$lib/components/node-editor.svelte';
-  import type { TreeNode } from '$lib/components/story-tree.svelte';
+  import type { TreeNode } from '../wizard-store.svelte';
 
   export let treeEditMode = false;
   export let storyId = '';
