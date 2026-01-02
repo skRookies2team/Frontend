@@ -1,15 +1,86 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
-  import { api, type UserProfileDto, type GameHistoryDto, type AchievementDto } from '$lib/api';
+  import { api, type UserProfileDto, type GameHistoryDto, type AchievementDto, type CreatedStoryDto } from '$lib/api';
+  import { storyApi } from '$lib/api/story-api';
+  import type { StorySearchResultDto } from '$lib/api/types/backend-types';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  
-  let activeTab = $state<'stories' | 'created' | 'stats'>('stories');
+
+  let activeTab = $state<'stories' | 'liked' | 'created' | 'stats'>('stories');
   let loading = $state(true);
   let profile: UserProfileDto | null = $state(null);
   let gameHistory: GameHistoryDto[] = $state([]);
+  let createdStories: CreatedStoryDto[] = $state([]);
+  let likedStories: StorySearchResultDto[] = $state([]);
   let achievements: AchievementDto[] = $state([]);
   let error = $state('');
+
+  // 삭제 관련 상태
+  let deleteModalOpen = $state(false);
+  let storyToDelete: CreatedStoryDto | null = $state(null);
+  let deleting = $state(false);
+
+  // 상대적 시간 표시 헬퍼 함수
+  function getRelativeTime(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) return '방금 전';
+    if (diffMins < 60) return `${diffMins}분 전`;
+    if (diffHours < 24) return `${diffHours}시간 전`;
+    if (diffDays < 7) return `${diffDays}일 전`;
+    return date.toLocaleDateString('ko-KR');
+  }
+
+  // 상태 표시 헬퍼 함수
+  function getStatusLabel(status: string): string {
+    const statusMap: Record<string, string> = {
+      'ANALYZING': '분석중',
+      'SUMMARY_READY': '요약 완료',
+      'CHARACTERS_READY': '캐릭터 분석 완료',
+      'GAUGES_READY': '게이지 준비',
+      'GAUGES_SELECTED': '게이지 선택됨',
+      'CONFIGURED': '설정 완료',
+      'GENERATING': '생성중',
+      'COMPLETED': '발행됨',
+      'FAILED': '실패'
+    };
+    return statusMap[status] || status;
+  }
+
+  // 삭제 모달 열기
+  function openDeleteModal(story: CreatedStoryDto) {
+    storyToDelete = story;
+    deleteModalOpen = true;
+  }
+
+  // 삭제 모달 닫기
+  function closeDeleteModal() {
+    deleteModalOpen = false;
+    storyToDelete = null;
+  }
+
+  // 스토리 삭제 실행
+  async function confirmDelete() {
+    if (!storyToDelete) return;
+
+    deleting = true;
+    try {
+      await api.story.deleteStory(storyToDelete.storyId);
+      // 삭제 성공 시 목록에서 제거
+      createdStories = createdStories.filter(s => s.storyId !== storyToDelete!.storyId);
+      closeDeleteModal();
+    } catch (err) {
+      console.error('Failed to delete story:', err);
+      alert('스토리 삭제에 실패했습니다.');
+    } finally {
+      deleting = false;
+    }
+  }
 
   onMount(async () => {
     // Check if user is authenticated
@@ -20,14 +91,18 @@
 
     try {
       // Load profile data
-      const [profileData, historyData, achievementsData] = await Promise.all([
+      const [profileData, historyData, createdData, likedData, achievementsData] = await Promise.all([
         api.user.getMyProfile(),
         api.user.getGameHistory(),
+        api.user.getCreatedStories(),
+        storyApi.getLikedStories(),
         api.user.getAchievements()
       ]);
 
       profile = profileData;
       gameHistory = historyData;
+      createdStories = createdData;
+      likedStories = likedData;
       achievements = achievementsData;
     } catch (err) {
       console.error('Failed to load profile:', err);
@@ -36,52 +111,6 @@
       loading = false;
     }
   });
-
-
-  // Mock data for stories (will be replaced with actual API)
-  const playedStories = [
-    {
-      id: 1,
-      title: '파리대왕',
-      author: '윌리엄 골딩',
-      progress: 75,
-      lastPlayed: '2시간 전',
-      thumbnail: '/boys-stranded-on-tropical-island-survival.jpg'
-    },
-    {
-      id: 2,
-      title: '죄와 벌',
-      author: '표도르 도스토옙스키',
-      progress: 45,
-      lastPlayed: '1일 전',
-      thumbnail: '/dark-19th-century-russian-street-atmospheric.jpg'
-    },
-    {
-      id: 3,
-      title: '위대한 개츠비',
-      author: 'F. 스콧 피츠제럴드',
-      progress: 100,
-      lastPlayed: '3일 전',
-      thumbnail: '/1920s-art-deco-mansion-gatsby-party-luxury.jpg'
-    }
-  ];
-  
-  const createdStories = [
-    {
-      id: 1,
-      title: '시간여행자의 딜레마',
-      views: 1542,
-      likes: 234,
-      status: 'published'
-    },
-    {
-      id: 2,
-      title: '마법학교의 비밀',
-      views: 892,
-      likes: 156,
-      status: 'draft'
-    }
-  ];
 </script>
 
 <div class="profile-page">
@@ -139,21 +168,28 @@
 
     <!-- Tabs -->
     <div class="profile-tabs">
-      <button 
+      <button
         class="tab"
         class:active={activeTab === 'stories'}
         onclick={() => activeTab = 'stories'}
       >
         📖 플레이한 스토리
       </button>
-      <button 
+      <button
+        class="tab"
+        class:active={activeTab === 'liked'}
+        onclick={() => activeTab = 'liked'}
+      >
+        ❤️ 좋아요한 스토리
+      </button>
+      <button
         class="tab"
         class:active={activeTab === 'created'}
         onclick={() => activeTab = 'created'}
       >
         ✍️ 작성한 스토리
       </button>
-      <button 
+      <button
         class="tab"
         class:active={activeTab === 'stats'}
         onclick={() => activeTab = 'stats'}
@@ -165,51 +201,145 @@
     <!-- Content -->
     <div class="profile-content">
       {#if activeTab === 'stories'}
-        <div class="stories-grid">
-          {#each playedStories as story}
-            <div class="story-card">
-              <div class="story-thumbnail">
-                <img src={story.thumbnail} alt={story.title} />
-                <div class="progress-overlay">
-                  <div class="progress-bar">
-                    <div class="progress-fill" style="width: {story.progress}%"></div>
+        {#if gameHistory.length > 0}
+          <div class="stories-grid">
+            {#each gameHistory as history}
+              <div class="story-card">
+                <div class="story-thumbnail">
+                  {#if history.thumbnailUrl}
+                    <img src={history.thumbnailUrl} alt={history.storyTitle} />
+                  {:else}
+                    <div class="thumbnail-placeholder">
+                      <span>📖</span>
+                    </div>
+                  {/if}
+                  <div class="progress-overlay">
+                    <div class="progress-bar">
+                      <div class="progress-fill" style="width: {history.isCompleted ? 100 : 50}%"></div>
+                    </div>
+                    <span class="progress-text">{history.isCompleted ? '완료' : '진행중'}</span>
                   </div>
-                  <span class="progress-text">{story.progress}% 완료</span>
+                </div>
+                <div class="story-info">
+                  <h3 class="story-title">{history.storyTitle}</h3>
+                  {#if history.finalEndingId}
+                    <p class="story-ending">엔딩: {history.finalEndingId}</p>
+                  {/if}
+                  <p class="story-meta">마지막 플레이: {getRelativeTime(history.updatedAt)}</p>
+                  <Button variant="outline" class="w-full" onclick={() => goto(`/play/${history.storyDataId}?session=${history.sessionId}`)}>
+                    {history.isCompleted ? '다시 플레이' : '이어하기'}
+                  </Button>
                 </div>
               </div>
-              <div class="story-info">
-                <h3 class="story-title">{story.title}</h3>
-                <p class="story-author">{story.author}</p>
-                <p class="story-meta">마지막 플레이: {story.lastPlayed}</p>
-                <Button variant="outline" class="w-full">
-                  이어하기
-                </Button>
+            {/each}
+          </div>
+        {:else}
+          <div class="empty-state">
+            <div class="empty-icon">📖</div>
+            <h3>플레이한 스토리가 없습니다</h3>
+            <p>새로운 스토리를 시작해보세요!</p>
+            <Button onclick={() => goto('/community')}>스토리 둘러보기</Button>
+          </div>
+        {/if}
+      {:else if activeTab === 'liked'}
+        {#if likedStories.length > 0}
+          <div class="stories-grid">
+            {#each likedStories as story}
+              <div class="story-card" onclick={() => goto(`/play/${story.id}`)}>
+                <div class="story-thumbnail">
+                  {#if story.thumbnailUrl}
+                    <img src={story.thumbnailUrl} alt={story.title} />
+                  {:else}
+                    <div class="thumbnail-placeholder">
+                      <span>❤️</span>
+                    </div>
+                  {/if}
+                  <div class="liked-badge">
+                    <span>❤️</span>
+                  </div>
+                </div>
+                <div class="story-info">
+                  <h3 class="story-title">{story.title}</h3>
+                  {#if story.genre}
+                    <p class="story-genre">{story.genre}</p>
+                  {/if}
+                  <div class="story-stats">
+                    <span>👁️ {story.viewCount?.toLocaleString() ?? 0}</span>
+                    <span>❤️ {story.likesCount?.toLocaleString() ?? 0}</span>
+                    <span>EP {story.totalEpisodes}</span>
+                  </div>
+                  <Button variant="outline" class="w-full" onclick={(e: MouseEvent) => { e.stopPropagation(); goto(`/play/${story.id}`); }}>
+                    플레이하기
+                  </Button>
+                </div>
               </div>
-            </div>
-          {/each}
-        </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="empty-state">
+            <div class="empty-icon">❤️</div>
+            <h3>좋아요한 스토리가 없습니다</h3>
+            <p>마음에 드는 스토리에 좋아요를 눌러보세요!</p>
+            <Button onclick={() => goto('/')}>스토리 둘러보기</Button>
+          </div>
+        {/if}
       {:else if activeTab === 'created'}
         <div class="created-list">
-          {#each createdStories as story}
-            <div class="created-card">
-              <div class="created-info">
-                <h3 class="created-title">{story.title}</h3>
-                <div class="created-stats">
-                  <span>👁️ {story.views}</span>
-                  <span>❤️ {story.likes}</span>
-                  <span class="status" class:published={story.status === 'published'}>
-                    {story.status === 'published' ? '발행됨' : '초안'}
-                  </span>
+          {#if createdStories.length > 0}
+            {#each createdStories as story}
+              <div class="created-card">
+                <div class="created-thumbnail">
+                  {#if story.thumbnailUrl}
+                    <img src={story.thumbnailUrl} alt={story.title} />
+                  {:else}
+                    <div class="thumbnail-placeholder small">
+                      <span>✍️</span>
+                    </div>
+                  {/if}
+                </div>
+                <div class="created-info">
+                  <h3 class="created-title">{story.title}</h3>
+                  {#if story.genre}
+                    <p class="created-genre">{story.genre}</p>
+                  {/if}
+                  <div class="created-stats">
+                    <span>👁️ {story.viewCount.toLocaleString()}</span>
+                    <span>❤️ {story.likesCount.toLocaleString()}</span>
+                    <span class="status" class:published={story.status === 'COMPLETED'}>
+                      {getStatusLabel(story.status)}
+                    </span>
+                  </div>
+                  {#if story.status === 'GENERATING'}
+                    <div class="progress-info">
+                      <div class="progress-bar-small">
+                        <div class="progress-fill" style="width: {story.progressPercentage}%"></div>
+                      </div>
+                      <span class="progress-text-small">{story.progressPercentage}% ({story.completedEpisodes}/{story.totalEpisodes} 에피소드)</span>
+                    </div>
+                  {/if}
+                  <p class="created-date">작성일: {new Date(story.createdAt).toLocaleDateString('ko-KR')}</p>
+                </div>
+                <div class="created-actions">
+                  {#if story.status === 'COMPLETED'}
+                    <Button variant="outline" size="sm" onclick={() => goto(`/creator/${story.storyId}/edit`)}>편집</Button>
+                    <Button variant="outline" size="sm" onclick={() => goto(`/play/${story.storyId}`)}>플레이</Button>
+                  {:else if story.status === 'GENERATING'}
+                    <Button variant="outline" size="sm" onclick={() => goto(`/creator/${story.storyId}/progress`)}>진행상황</Button>
+                  {:else}
+                    <Button variant="outline" size="sm" onclick={() => goto(`/creator/${story.storyId}`)}>계속하기</Button>
+                  {/if}
+                  <Button variant="ghost" size="sm" class="delete-btn" onclick={() => openDeleteModal(story)}>삭제</Button>
                 </div>
               </div>
-              <div class="created-actions">
-                <Button variant="outline" size="sm">편집</Button>
-                <Button variant="outline" size="sm">통계</Button>
-                <Button variant="ghost" size="sm">삭제</Button>
-              </div>
+            {/each}
+          {:else}
+            <div class="empty-state">
+              <div class="empty-icon">✍️</div>
+              <h3>작성한 스토리가 없습니다</h3>
+              <p>나만의 스토리를 만들어보세요!</p>
             </div>
-          {/each}
-          <Button class="w-full">
+          {/if}
+          <Button class="w-full" onclick={() => goto('/creator')}>
             ➕ 새 스토리 만들기
           </Button>
         </div>
@@ -317,6 +447,31 @@
   </div>
   {/if}
 </div>
+
+<!-- 삭제 확인 모달 -->
+{#if deleteModalOpen && storyToDelete}
+  <div class="modal-overlay" onclick={closeDeleteModal} role="dialog" aria-modal="true">
+    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
+      <div class="modal-header">
+        <h3 class="modal-title">스토리 삭제</h3>
+      </div>
+      <div class="modal-body">
+        <p class="modal-warning">정말로 이 스토리를 삭제하시겠습니까?</p>
+        <p class="modal-story-title">"{storyToDelete.title}"</p>
+        <p class="modal-description">
+          삭제 시 스토리 데이터, 에피소드, 노드, 선택지 및 관련 이미지가 <strong>모두 영구적으로 삭제</strong>됩니다.
+          이 작업은 취소할 수 없습니다.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <Button variant="outline" onclick={closeDeleteModal} disabled={deleting}>취소</Button>
+        <Button variant="destructive" onclick={confirmDelete} disabled={deleting}>
+          {deleting ? '삭제 중...' : '삭제'}
+        </Button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .profile-page {
@@ -526,12 +681,6 @@
     font-weight: 700;
     margin-bottom: 0.25rem;
     color: hsl(var(--foreground));
-  }
-
-  .story-author {
-    font-size: 0.875rem;
-    color: hsl(var(--muted-foreground));
-    margin-bottom: 0.5rem;
   }
 
   .story-meta {
@@ -903,6 +1052,234 @@
 
   .stat-label {
     color: hsl(var(--muted-foreground));
+  }
+
+  /* Thumbnail Placeholder */
+  .thumbnail-placeholder {
+    width: 100%;
+    height: 100%;
+    background: hsl(var(--muted));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+  }
+
+  .thumbnail-placeholder.small {
+    width: 80px;
+    height: 80px;
+    font-size: 2rem;
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+  }
+
+  /* Empty State */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg);
+  }
+
+  .empty-state .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  .empty-state h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+    margin-bottom: 0.5rem;
+  }
+
+  .empty-state p {
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 1.5rem;
+  }
+
+  /* Story Ending */
+  .story-ending {
+    font-size: 0.875rem;
+    color: hsl(var(--primary));
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  /* Liked Badge */
+  .liked-badge {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 32px;
+    height: 32px;
+    background: hsl(0 85% 60%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Story Genre */
+  .story-genre {
+    font-size: 0.75rem;
+    color: hsl(var(--primary));
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  /* Story Stats */
+  .story-stats {
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 1rem;
+  }
+
+  .story-card {
+    cursor: pointer;
+  }
+
+  /* Created Story Enhancements */
+  .created-card {
+    gap: 1rem;
+  }
+
+  .created-thumbnail {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .created-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .created-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .created-genre {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 0.5rem;
+  }
+
+  .created-date {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    margin-top: 0.5rem;
+  }
+
+  /* Progress Bar Small */
+  .progress-info {
+    margin-top: 0.5rem;
+  }
+
+  .progress-bar-small {
+    width: 100%;
+    max-width: 200px;
+    height: 4px;
+    background: hsl(var(--muted));
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+  }
+
+  .progress-text-small {
+    font-size: 0.7rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Delete Button */
+  .delete-btn {
+    color: hsl(var(--destructive));
+  }
+
+  .delete-btn:hover {
+    background: hsl(var(--destructive) / 0.1);
+    color: hsl(var(--destructive));
+  }
+
+  /* Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-content {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg);
+    max-width: 450px;
+    width: 90%;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  }
+
+  .modal-header {
+    padding: 1.5rem 1.5rem 0;
+  }
+
+  .modal-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+    margin: 0;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .modal-warning {
+    font-size: 1rem;
+    color: hsl(var(--foreground));
+    margin: 0 0 0.75rem;
+  }
+
+  .modal-story-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: hsl(var(--primary));
+    margin: 0 0 1rem;
+  }
+
+  .modal-description {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .modal-description strong {
+    color: hsl(var(--destructive));
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem 1.5rem;
   }
 
   @media (max-width: 768px) {

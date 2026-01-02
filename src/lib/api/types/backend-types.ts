@@ -300,11 +300,27 @@ export interface GameHistoryDto {
   sessionId: string;
   storyDataId: number;
   storyTitle: string;
+  thumbnailUrl: string;
   isCompleted: boolean;
   finalEndingId: string;
   gaugeStates: Record<string, number>;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreatedStoryDto {
+  storyId: string;
+  title: string;
+  genre: string;
+  description: string;
+  status: StoryStatus;
+  thumbnailUrl: string;
+  createdAt: string;
+  totalEpisodes: number;
+  completedEpisodes: number;
+  progressPercentage: number;
+  likesCount: number;
+  viewCount: number;
 }
 
 export interface AchievementDto {
@@ -332,6 +348,8 @@ export interface StoryData {
   totalNodes: number;
   thumbnailUrl: string;
   thumbnailFileKey: string;
+  likesCount: number;
+  viewCount: number;
   createdAt: string;
 }
 
@@ -605,6 +623,34 @@ export interface HealthCheckResponse {
   [key: string]: any;
 }
 
+// ==================== Story Search ====================
+
+export type StorySortBy = 'popular' | 'likes' | 'latest';
+
+export interface StorySearchParams {
+  keyword?: string;
+  page?: number;
+  size?: number;
+  sortBy?: StorySortBy;
+}
+
+export interface StorySearchResultDto {
+  id: number;
+  title: string;
+  genre: string;
+  description: string;
+  storyFileKey: string;
+  totalEpisodes: number;
+  totalNodes: number;
+  thumbnailUrl: string;
+  thumbnailFileKey: string;
+  likesCount: number;
+  viewCount: number;
+  createdAt: string;
+}
+
+export type PageStorySearchResultDto = Page<StorySearchResultDto>;
+
 // ==================== Image Management ====================
 
 /**
@@ -674,5 +720,16 @@ export interface ThumbnailUpdateRequestDto {
 export interface ThumbnailUpdateResponseDto {
   thumbnailUrl: string;
   message: string;
+}
+
+// ==================== Like Management ====================
+
+/**
+ * 좋아요 토글 응답
+ */
+export interface LikeToggleResponseDto {
+  liked: boolean; // 좋아요 상태 (true: 추가됨, false: 취소됨)
+  message: string; // 처리 결과 메시지
+  username: string; // 동작을 수행한 사용자 아이디
 }
 

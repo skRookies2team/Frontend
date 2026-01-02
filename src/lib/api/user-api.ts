@@ -7,7 +7,8 @@ import type {
   UserProfileDto,
   UpdateProfileRequestDto,
   GameHistoryDto,
-  AchievementDto
+  AchievementDto,
+  CreatedStoryDto
 } from './types/backend-types';
 
 export class UserApi {
@@ -44,6 +45,13 @@ export class UserApi {
    */
   async getAchievements(): Promise<AchievementDto[]> {
     return httpClient.get<AchievementDto[]>('/api/users/me/achievements');
+  }
+
+  /**
+   * Get created stories
+   */
+  async getCreatedStories(): Promise<CreatedStoryDto[]> {
+    return httpClient.get<CreatedStoryDto[]>('/api/users/me/created-stories');
   }
 }
 

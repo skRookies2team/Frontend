@@ -1,9 +1,11 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { api, PostType, type PostResponseDto } from '$lib/api';
+  import { storyApi } from '$lib/api/story-api';
+  import type { StorySearchResultDto } from '$lib/api/types/backend-types';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  
+
   let activeTab = $state<'popular' | 'recent' | 'following'>('popular');
   let posts: PostResponseDto[] = $state([]);
   let loading = $state(true);
@@ -11,6 +13,10 @@
   let totalPages = $state(0);
   let error = $state('');
   let isLoggedIn = $state(false);
+
+  // 주간 인기 스토리 랭킹
+  let weeklyRankings: StorySearchResultDto[] = $state([]);
+  let rankingsLoading = $state(true);
   
   // 글쓰기 모달
   let showWriteModal = $state(false);
@@ -39,9 +45,26 @@
   onMount(() => {
     // 로그인 상태 확인
     isLoggedIn = api.auth.isAuthenticated();
-    
+
     loadPosts();
+    loadWeeklyRankings();
   });
+
+  async function loadWeeklyRankings() {
+    rankingsLoading = true;
+    try {
+      weeklyRankings = await storyApi.getWeeklyRankings(5);
+    } catch (err) {
+      console.error('주간 랭킹 로드 실패:', err);
+      weeklyRankings = [];
+    } finally {
+      rankingsLoading = false;
+    }
+  }
+
+  function goToStory(storyId: number) {
+    window.location.href = `/play/${storyId}`;
+  }
 
   async function loadPosts() {
     loading = true;
@@ -623,32 +646,50 @@
 
       <!-- Sidebar -->
       <aside class="sidebar">
-        <!-- Popular Tags -->
-        <div class="sidebar-card">
-          <h3 class="sidebar-title">인기 태그</h3>
-          <div class="tags-grid">
-            <button class="tag-btn">#판타지</button>
-            <button class="tag-btn">#로맨스</button>
-            <button class="tag-btn">#추리</button>
-            <button class="tag-btn">#SF</button>
-            <button class="tag-btn">#팁</button>
-            <button class="tag-btn">#질문</button>
-            <button class="tag-btn">#AI</button>
-            <button class="tag-btn">#완성</button>
-          </div>
-        </div>
-
-        <!-- Active Users -->
-        <div class="sidebar-card">
-          <h3 class="sidebar-title">활동중인 작가</h3>
-          <div class="users-list">
-            {#each ['김작가', '이소설', '박스토리', '최문학', '정이야기'] as user}
-              <div class="user-item">
-                <div class="user-status"></div>
-                <span>{user}</span>
-              </div>
-            {/each}
-          </div>
+        <!-- Weekly Rankings -->
+        <div class="sidebar-card ranking-card">
+          <h3 class="sidebar-title">
+            <span class="ranking-icon">🏆</span>
+            주간 인기 스토리
+          </h3>
+          {#if rankingsLoading}
+            <div class="ranking-loading">로딩중...</div>
+          {:else if weeklyRankings.length === 0}
+            <div class="ranking-empty">랭킹 정보가 없습니다</div>
+          {:else}
+            <div class="ranking-list">
+              {#each weeklyRankings as story, index}
+                <button
+                  type="button"
+                  class="ranking-item"
+                  onclick={() => goToStory(story.id)}
+                >
+                  <div class="ranking-rank" class:top1={index === 0} class:top2={index === 1} class:top3={index === 2}>
+                    {index + 1}
+                  </div>
+                  <div class="ranking-thumbnail">
+                    {#if story.thumbnailUrl}
+                      <img src={story.thumbnailUrl} alt={story.title} />
+                    {:else}
+                      <div class="thumbnail-placeholder">📖</div>
+                    {/if}
+                  </div>
+                  <div class="ranking-info">
+                    <div class="ranking-title">{story.title}</div>
+                    <div class="ranking-meta">
+                      {#if story.genre}
+                        <span class="ranking-genre">{story.genre}</span>
+                      {/if}
+                      <span class="ranking-stats">
+                        <span>👁️ {story.viewCount}</span>
+                        <span>❤️ {story.likesCount}</span>
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              {/each}
+            </div>
+          {/if}
         </div>
 
         <!-- Community Rules -->
@@ -1233,65 +1274,148 @@
     font-size: 0.95rem;
   }
 
-  .tags-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
+  /* Ranking Styles */
+  .ranking-card {
+    padding: 1.25rem;
+  }
+
+  .sidebar-title {
+    display: flex;
+    align-items: center;
     gap: 0.5rem;
   }
 
-  .tag-btn {
-    padding: 0.625rem;
-    background: hsla(240 12% 15% / 0.6);
-    border: 1px solid hsl(var(--border));
-    border-radius: var(--radius-md);
+  .ranking-icon {
+    font-size: 1.25rem;
+  }
+
+  .ranking-loading,
+  .ranking-empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: hsl(var(--muted-foreground));
     font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .tag-btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: var(--gradient-primary);
-    opacity: 0;
-    transition: opacity 0.3s ease;
   }
 
-  .tag-btn:hover {
-    background: var(--gradient-primary);
-    color: white;
-    border-color: hsl(var(--primary));
-    box-shadow: 0 4px 12px hsla(0 90% 48% / 0.3);
-    transform: translateY(-2px);
-  }
-  
-  .tag-btn:hover::before {
-    opacity: 1;
-  }
-
-  .users-list {
+  .ranking-list {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
   }
 
-  .user-item {
+  .ranking-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: hsla(240 12% 15% / 0.4);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: left;
+    width: 100%;
+  }
+
+  .ranking-item:hover {
+    background: hsla(0 90% 48% / 0.1);
+    border-color: hsl(var(--border-bright));
+    transform: translateX(4px);
+  }
+
+  .ranking-rank {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: hsla(240 12% 20% / 0.8);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 800;
+    color: hsl(var(--muted-foreground));
+    flex-shrink: 0;
+  }
+
+  .ranking-rank.top1 {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: #1a1a1a;
+    box-shadow: 0 2px 8px hsla(45 100% 50% / 0.3);
+  }
+
+  .ranking-rank.top2 {
+    background: linear-gradient(135deg, #C0C0C0, #A0A0A0);
+    color: #1a1a1a;
+    box-shadow: 0 2px 8px hsla(0 0% 75% / 0.3);
+  }
+
+  .ranking-rank.top3 {
+    background: linear-gradient(135deg, #CD7F32, #B8860B);
+    color: #1a1a1a;
+    box-shadow: 0 2px 8px hsla(30 60% 50% / 0.3);
+  }
+
+  .ranking-thumbnail {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    flex-shrink: 0;
+    background: hsl(var(--muted));
+  }
+
+  .ranking-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .thumbnail-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    background: hsla(240 12% 18% / 0.8);
+  }
+
+  .ranking-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ranking-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 0.25rem;
+  }
+
+  .ranking-meta {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.875rem;
-    color: hsl(var(--foreground));
+    flex-wrap: wrap;
   }
 
-  .user-status {
-    width: 8px;
-    height: 8px;
-    background: #22c55e;
-    border-radius: 50%;
+  .ranking-genre {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.125rem 0.375rem;
+    background: hsla(0 90% 48% / 0.15);
+    color: hsl(var(--primary));
+    border-radius: 4px;
+  }
+
+  .ranking-stats {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.6875rem;
+    color: hsl(var(--muted-foreground));
   }
 
   .rules-list {

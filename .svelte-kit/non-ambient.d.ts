@@ -27,7 +27,7 @@ export {};
 
 declare module "$app/types" {
 	export interface AppTypes {
-		RouteId(): "/" | "/community" | "/community/[postId]" | "/creator" | "/creator/wizard" | "/creator/wizard/steps" | "/login" | "/play" | "/play/[novel_id]" | "/profile";
+		RouteId(): "/" | "/community" | "/community/[postId]" | "/creator" | "/creator/wizard" | "/creator/wizard/steps" | "/login" | "/play" | "/play/[novel_id]" | "/profile" | "/search";
 		RouteParams(): {
 			"/community/[postId]": { postId: string };
 			"/play/[novel_id]": { novel_id: string }
@@ -42,9 +42,10 @@ declare module "$app/types" {
 			"/login": Record<string, never>;
 			"/play": { novel_id?: string };
 			"/play/[novel_id]": { novel_id: string };
-			"/profile": Record<string, never>
+			"/profile": Record<string, never>;
+			"/search": Record<string, never>
 		};
-		Pathname(): "/" | "/community" | "/community/" | `/community/${string}` & {} | `/community/${string}/` & {} | "/creator" | "/creator/" | "/creator/wizard" | "/creator/wizard/" | "/creator/wizard/steps" | "/creator/wizard/steps/" | "/login" | "/login/" | "/play" | "/play/" | `/play/${string}` & {} | `/play/${string}/` & {} | "/profile" | "/profile/";
+		Pathname(): "/" | "/community" | "/community/" | `/community/${string}` & {} | `/community/${string}/` & {} | "/creator" | "/creator/" | "/creator/wizard" | "/creator/wizard/" | "/creator/wizard/steps" | "/creator/wizard/steps/" | "/login" | "/login/" | "/play" | "/play/" | `/play/${string}` & {} | `/play/${string}/` & {} | "/profile" | "/profile/" | "/search" | "/search/";
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
 		Asset(): "/111281-690770684_small.mp4" | "/favicon.png" | string & {};
 	}

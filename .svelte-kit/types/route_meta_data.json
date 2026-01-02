@@ -6,5 +6,6 @@
 	"/creator/wizard": [],
 	"/login": [],
 	"/play/[novel_id]": [],
-	"/profile": []
+	"/profile": [],
+	"/search": []
 }

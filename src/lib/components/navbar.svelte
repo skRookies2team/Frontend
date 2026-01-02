@@ -1,11 +1,12 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
   import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
   import { api } from '$lib/api';
   import { isAuthenticated, user } from '$lib/stores/auth';
-  
+
   let searchQuery = $state('');
-  
+
   async function handleLogout() {
     try {
       await api.auth.logout();
@@ -21,11 +22,21 @@
       window.location.href = '/';
     }
   }
-  
-  $effect(() => {
-    // You can handle search query changes here
-    console.log('Search query:', searchQuery);
-  });
+
+  function handleSearch() {
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery) {
+      goto(`/search?keyword=${encodeURIComponent(trimmedQuery)}`);
+    } else {
+      goto('/search');
+    }
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      handleSearch();
+    }
+  }
 </script>
 
 <nav class="navbar">
@@ -41,13 +52,14 @@
     
     <div class="nav-right">
       <div class="search-box">
-        <input 
-          type="text" 
-          placeholder="작품이름을 입력해 주세요" 
+        <input
+          type="text"
+          placeholder="작품이름을 입력해 주세요"
           bind:value={searchQuery}
+          onkeydown={handleKeydown}
           class="search-input"
         />
-        <button type="button" class="search-btn" aria-label="검색">
+        <button type="button" class="search-btn" onclick={handleSearch} aria-label="검색">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <path d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM18 18l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>

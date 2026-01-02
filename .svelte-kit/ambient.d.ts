@@ -50,8 +50,6 @@ declare module '$env/static/private' {
 	export const EDITOR: string;
 	export const ENABLE_IDE_INTEGRATION: string;
 	export const EXEPATH: string;
-	export const FPS_BROWSER_APP_PROFILE_STRING: string;
-	export const FPS_BROWSER_USER_PROFILE_STRING: string;
 	export const GIT_ASKPASS: string;
 	export const GIT_EDITOR: string;
 	export const HOME: string;
@@ -197,8 +195,6 @@ declare module '$env/dynamic/private' {
 		EDITOR: string;
 		ENABLE_IDE_INTEGRATION: string;
 		EXEPATH: string;
-		FPS_BROWSER_APP_PROFILE_STRING: string;
-		FPS_BROWSER_USER_PROFILE_STRING: string;
 		GIT_ASKPASS: string;
 		GIT_EDITOR: string;
 		HOME: string;

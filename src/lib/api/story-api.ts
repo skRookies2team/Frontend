@@ -31,6 +31,10 @@ import type {
   ThumbnailResponseDto,
   ThumbnailUpdateRequestDto,
   ThumbnailUpdateResponseDto,
+  StorySearchParams,
+  StorySearchResultDto,
+  PageStorySearchResultDto,
+  LikeToggleResponseDto,
 } from './types/backend-types';
 
 export class StoryApi {
@@ -243,6 +247,141 @@ export class StoryApi {
       `/api/stories/${storyId}/thumbnail`,
       data
     );
+  }
+
+  /**
+   * 스토리 삭제
+   * 본인이 생성한 스토리만 삭제 가능합니다.
+   * 삭제 시 StoryCreation, StoryData, Episodes, Nodes, Choices 및 S3 파일이 모두 삭제됩니다.
+   */
+  async deleteStory(storyId: string): Promise<void> {
+    return httpClient.delete<void>(`/api/stories/${storyId}`);
+  }
+
+  // ==================== Story Search ====================
+
+  /**
+   * 스토리 검색
+   * 제목, 설명, 장르를 기반으로 스토리를 검색합니다.
+   * @param params 검색 파라미터 (keyword, page, size, sortBy)
+   */
+  async searchStories(params: StorySearchParams = {}): Promise<PageStorySearchResultDto> {
+    const queryParams = new URLSearchParams();
+
+    if (params.keyword) {
+      queryParams.append('keyword', params.keyword);
+    }
+    if (params.page !== undefined) {
+      queryParams.append('page', params.page.toString());
+    }
+    if (params.size !== undefined) {
+      queryParams.append('size', params.size.toString());
+    }
+    if (params.sortBy) {
+      queryParams.append('sortBy', params.sortBy);
+    }
+
+    const queryString = queryParams.toString();
+    const url = `/api/stories/search${queryString ? `?${queryString}` : ''}`;
+
+    return httpClient.get<PageStorySearchResultDto>(url);
+  }
+
+  // ==================== Rankings ====================
+
+  /**
+   * 주간 인기 스토리 랭킹 조회
+   * @param limit 조회할 스토리 수 (기본값 10)
+   */
+  async getWeeklyRankings(limit: number = 10): Promise<StorySearchResultDto[]> {
+    return httpClient.get<StorySearchResultDto[]>(`/api/rankings/stories/weekly?limit=${limit}`);
+  }
+
+  /**
+   * 인기 스토리 조회 (조회수 기준)
+   * @param page 페이지 번호 (0부터 시작, 기본값 0)
+   * @param size 페이지당 스토리 수 (기본값 10)
+   */
+  async getPopularStories(page: number = 0, size: number = 10): Promise<PageStorySearchResultDto> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('page', page.toString());
+    queryParams.append('size', size.toString());
+
+    return httpClient.get<PageStorySearchResultDto>(`/api/stories/popular?${queryParams.toString()}`);
+  }
+
+  /**
+   * 최신 스토리 조회
+   * @param page 페이지 번호 (0부터 시작, 기본값 0)
+   * @param size 페이지당 스토리 수 (기본값 10)
+   */
+  async getLatestStories(page: number = 0, size: number = 10): Promise<PageStorySearchResultDto> {
+    return this.searchStories({ page, size, sortBy: 'latest' });
+  }
+
+  /**
+   * 좋아요 많은 스토리 조회 (추천 콘텐츠)
+   * @param page 페이지 번호 (0부터 시작, 기본값 0)
+   * @param size 페이지당 스토리 수 (기본값 10)
+   */
+  async getMostLikedStories(page: number = 0, size: number = 10): Promise<PageStorySearchResultDto> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('page', page.toString());
+    queryParams.append('size', size.toString());
+
+    return httpClient.get<PageStorySearchResultDto>(`/api/stories/most-liked?${queryParams.toString()}`);
+  }
+
+  /**
+   * 사용자가 좋아요 누른 스토리 목록 조회
+   * @returns 좋아요한 스토리 목록
+   */
+  async getLikedStories(): Promise<StorySearchResultDto[]> {
+    return httpClient.get<StorySearchResultDto[]>('/api/likes/stories');
+  }
+
+  // ==================== Likes ====================
+
+  /**
+   * 스토리 좋아요 토글
+   * 좋아요를 추가하거나 이미 추가된 경우 취소합니다
+   * @param storyDataId 스토리 ID
+   * @returns 좋아요 상태, 메시지, 사용자 정보
+   */
+  async toggleLike(storyDataId: number): Promise<LikeToggleResponseDto> {
+    return httpClient.post<LikeToggleResponseDto>(`/api/likes/stories/${storyDataId}`, {});
+  }
+
+  /**
+   * 스토리 좋아요 상태 조회
+   * 현재 사용자가 해당 스토리에 좋아요를 눌렀는지 확인합니다
+   * @param storyDataId 스토리 ID
+   * @returns 좋아요 여부 (true/false)
+   */
+  async getLikeStatus(storyDataId: number): Promise<boolean> {
+    return httpClient.get<boolean>(`/api/likes/stories/${storyDataId}/status`);
+  }
+
+  /**
+   * 여러 스토리의 좋아요 상태 일괄 조회
+   * @param storyDataIds 스토리 ID 배열
+   * @returns 스토리 ID를 키로 하는 좋아요 상태 맵
+   */
+  async getLikeStatuses(storyDataIds: number[]): Promise<Map<number, boolean>> {
+    const statusMap = new Map<number, boolean>();
+
+    // 병렬로 조회
+    const results = await Promise.allSettled(
+      storyDataIds.map(id => this.getLikeStatus(id).then(status => ({ id, status })))
+    );
+
+    results.forEach(result => {
+      if (result.status === 'fulfilled') {
+        statusMap.set(result.value.id, result.value.status);
+      }
+    });
+
+    return statusMap;
   }
 }
 

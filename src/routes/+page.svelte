@@ -1,12 +1,19 @@
 <script lang="ts">
   import { api, type StoryData } from '$lib/api';
+  import { storyApi } from '$lib/api/story-api';
+  import type { StorySearchResultDto } from '$lib/api/types/backend-types';
+  import { goto } from '$app/navigation';
   import { Button } from '$lib/components/ui/button';
   import { onMount } from 'svelte';
-  
-  let stories: StoryData[] = $state([]);
+
+  // StoryData와 StorySearchResultDto 공통 타입
+  type DisplayStory = StoryData | StorySearchResultDto;
+
+  let stories: DisplayStory[] = $state([]);
   let loading = $state(true);
   let error = $state('');
   let selectedCategory = $state('전체');
+  let selectedContentFilter = $state<'전체' | '인기 콘텐츠' | '최신 등록' | '추천 콘텐츠'>('전체');
   let searchQuery = $state('');
   let isLoggedIn = $state(false);
   let categoryDropdownOpen = $state(false);
@@ -14,6 +21,10 @@
   let viewMode = $state<'grid' | 'list'>('grid');
   let categoryDropdownRef: HTMLElement | null = $state(null);
   let recommendationDropdownRef: HTMLElement | null = $state(null);
+
+  // 좋아요 상태 관리
+  let likeStatuses: Map<number, boolean> = $state(new Map());
+  let likeCounts: Map<number, number> = $state(new Map());
 
   function handleClickOutside(event: MouseEvent) {
     if (categoryDropdownRef && !categoryDropdownRef.contains(event.target as Node)) {
@@ -23,13 +34,13 @@
       recommendationDropdownOpen = false;
     }
   }
-  
+
   // 카테고리는 임시로 하드코딩 (백엔드에 카테고리 정보가 없으므로)
   const categories = ['전체', '고전문학', 'SF', '추리', '판타지', '로맨스', '교육'];
-  
+
   onMount(async () => {
     try {
-      stories = await api.game.getAllStories();
+      await loadStories();
       // 로그인 상태 확인
       isLoggedIn = api.auth.isAuthenticated();
     } catch (err) {
@@ -45,28 +56,119 @@
       document.removeEventListener('click', handleClickOutside);
     };
   });
-  
+
+  async function loadStories() {
+    loading = true;
+    error = '';
+
+    try {
+      let loadedStories: DisplayStory[] = [];
+
+      if (selectedContentFilter === '인기 콘텐츠') {
+        const result = await storyApi.getPopularStories(0, 50);
+        loadedStories = result.content;
+      } else if (selectedContentFilter === '최신 등록') {
+        const result = await storyApi.getLatestStories(0, 50);
+        loadedStories = result.content;
+      } else if (selectedContentFilter === '추천 콘텐츠') {
+        const result = await storyApi.getMostLikedStories(0, 50);
+        loadedStories = result.content;
+      } else {
+        loadedStories = await api.game.getAllStories();
+      }
+
+      stories = loadedStories;
+
+      // 좋아요 수 초기화
+      stories.forEach(story => {
+        likeCounts.set(story.id, story.likesCount ?? 0);
+      });
+
+      // 로그인 상태일 때만 좋아요 상태 로드
+      if (isLoggedIn && stories.length > 0) {
+        await loadLikeStatuses();
+      }
+    } catch (err) {
+      console.error('Failed to load stories:', err);
+      error = '스토리를 불러오는데 실패했습니다.';
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function handleContentFilterChange(filter: '전체' | '인기 콘텐츠' | '최신 등록' | '추천 콘텐츠') {
+    if (selectedContentFilter === filter) return;
+    selectedContentFilter = filter;
+    recommendationDropdownOpen = false;
+    await loadStories();
+  }
+
+  async function loadLikeStatuses() {
+    const storyIds = stories.map(s => s.id);
+    try {
+      likeStatuses = await storyApi.getLikeStatuses(storyIds);
+    } catch (err) {
+      console.error('Failed to load like statuses:', err);
+    }
+  }
+
+  async function handleLikeToggle(event: MouseEvent, storyId: number) {
+    event.stopPropagation();
+
+    if (!isLoggedIn) {
+      alert('로그인이 필요합니다.');
+      goto('/login');
+      return;
+    }
+
+    try {
+      const response = await storyApi.toggleLike(storyId);
+
+      // API 응답에서 좋아요 상태 업데이트
+      const newStatuses = new Map(likeStatuses);
+      newStatuses.set(storyId, response.liked);
+      likeStatuses = newStatuses;
+
+      // 좋아요 수 업데이트
+      const currentCount = likeCounts.get(storyId) ?? 0;
+      const newCounts = new Map(likeCounts);
+      newCounts.set(storyId, response.liked ? currentCount + 1 : currentCount - 1);
+      likeCounts = newCounts;
+    } catch (err) {
+      console.error('Failed to toggle like:', err);
+      alert('좋아요 처리에 실패했습니다.');
+    }
+  }
+
+  function isLiked(storyId: number): boolean {
+    return likeStatuses.get(storyId) ?? false;
+  }
+
+  function getLikeCount(storyId: number): number {
+    return likeCounts.get(storyId) ?? 0;
+  }
+
   let filteredStories = $derived.by(() => {
     let result = stories;
-    
+
     // 장르 필터
     if (selectedCategory !== '전체') {
       result = result.filter(story => story.genre === selectedCategory);
     }
-    
+
     // 검색 필터
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(story => 
+      result = result.filter(story =>
         story.title.toLowerCase().includes(query) ||
         story.description.toLowerCase().includes(query)
       );
     }
-    
+
     return result;
   });
-  
-  function startStory(story: StoryData) {
+
+  function startStory(story: DisplayStory) {
     window.location.href = `/play/${story.id}`;
   }
 </script>
@@ -120,22 +222,23 @@
           </div>
           
           <div class="dropdown-wrapper" bind:this={recommendationDropdownRef}>
-            <button 
+            <button
               type="button"
               class="header-dropdown-trigger"
+              class:active={selectedContentFilter !== '전체'}
               onclick={(e) => {
                 e.stopPropagation();
                 recommendationDropdownOpen = !recommendationDropdownOpen;
               }}
               aria-expanded={recommendationDropdownOpen}
             >
-              <span>추천 콘텐츠</span>
-              <svg 
-                class="dropdown-icon" 
+              <span>{selectedContentFilter === '전체' ? '콘텐츠 필터' : selectedContentFilter}</span>
+              <svg
+                class="dropdown-icon"
                 class:open={recommendationDropdownOpen}
-                width="12" 
-                height="12" 
-                viewBox="0 0 12 12" 
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
                 fill="none"
               >
                 <path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -143,9 +246,38 @@
             </button>
             {#if recommendationDropdownOpen}
               <div class="header-dropdown-menu" onclick={(e) => e.stopPropagation()}>
-                <button type="button" class="header-dropdown-item">인기 콘텐츠</button>
-                <button type="button" class="header-dropdown-item">최신 등록</button>
-                <button type="button" class="header-dropdown-item">추천 콘텐츠</button>
+                <button
+                  type="button"
+                  class="header-dropdown-item"
+                  class:active={selectedContentFilter === '전체'}
+                  onclick={() => handleContentFilterChange('전체')}
+                >
+                  전체
+                </button>
+                <button
+                  type="button"
+                  class="header-dropdown-item"
+                  class:active={selectedContentFilter === '인기 콘텐츠'}
+                  onclick={() => handleContentFilterChange('인기 콘텐츠')}
+                >
+                  인기 콘텐츠
+                </button>
+                <button
+                  type="button"
+                  class="header-dropdown-item"
+                  class:active={selectedContentFilter === '최신 등록'}
+                  onclick={() => handleContentFilterChange('최신 등록')}
+                >
+                  최신 등록
+                </button>
+                <button
+                  type="button"
+                  class="header-dropdown-item"
+                  class:active={selectedContentFilter === '추천 콘텐츠'}
+                  onclick={() => handleContentFilterChange('추천 콘텐츠')}
+                >
+                  추천 콘텐츠
+                </button>
               </div>
             {/if}
           </div>
@@ -205,19 +337,42 @@
                 <div class="netflix-card" onclick={() => startStory(story)}>
                   <div class="netflix-card-image">
                     <img src={story.thumbnailUrl} alt={story.title} />
-                    {#if Math.random() > 0.7}
-                      <div class="top10-badge">TOP 10</div>
+                    {#if story.genre}
+                      <div class="genre-badge">{story.genre}</div>
                     {/if}
+                    <!-- 좋아요 버튼 -->
+                    <button
+                      type="button"
+                      class="like-button"
+                      class:liked={isLiked(story.id)}
+                      onclick={(e) => handleLikeToggle(e, story.id)}
+                      aria-label={isLiked(story.id) ? '좋아요 취소' : '좋아요'}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill={isLiked(story.id) ? 'currentColor' : 'none'}>
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="2"/>
+                      </svg>
+                    </button>
                   </div>
                   <div class="netflix-card-info">
                     <h3 class="netflix-card-title">{story.title}</h3>
-                    <p class="netflix-card-episode">
-                      {#if Math.random() > 0.5}
-                        새로운 에피소드 지금 시청하기
-                      {:else}
-                        다음 에피소드 {['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'][Math.floor(Math.random() * 7)]}
-                      {/if}
-                    </p>
+                    <div class="netflix-card-meta">
+                      <span class="meta-item">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                          <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke="currentColor" stroke-width="2"/>
+                          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        {story.viewCount ?? 0}
+                      </span>
+                      <span class="meta-item" class:liked={isLiked(story.id)}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill={isLiked(story.id) ? 'currentColor' : 'none'}>
+                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        {getLikeCount(story.id)}
+                      </span>
+                      <span class="meta-item episodes">
+                        EP {story.totalEpisodes}
+                      </span>
+                    </div>
                   </div>
                 </div>
               {/each}
@@ -302,6 +457,12 @@
   .header-dropdown-trigger:hover {
     background: hsl(var(--muted));
     border-color: hsl(var(--primary));
+  }
+
+  .header-dropdown-trigger.active {
+    background: hsl(var(--primary) / 0.1);
+    border-color: hsl(var(--primary));
+    color: hsl(var(--primary));
   }
 
   .dropdown-icon {
@@ -492,11 +653,90 @@
     overflow: hidden;
   }
 
-  .netflix-card-episode {
+  .netflix-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
     font-size: 0.8125rem;
     color: hsl(var(--muted-foreground));
-    line-height: 1.4;
-    margin: 0;
+  }
+
+  .meta-item svg {
+    opacity: 0.7;
+  }
+
+  .meta-item.episodes {
+    background: hsl(var(--muted));
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.75rem;
+  }
+
+  .genre-badge {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    z-index: 2;
+  }
+
+  .like-button {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: hsla(0 0% 0% / 0.6);
+    backdrop-filter: blur(4px);
+    border: none;
+    border-radius: 50%;
+    color: hsl(var(--foreground));
+    cursor: pointer;
+    z-index: 3;
+    transition: all 0.3s ease;
+    opacity: 0;
+  }
+
+  .netflix-card:hover .like-button {
+    opacity: 1;
+  }
+
+  .like-button:hover {
+    background: hsla(0 0% 0% / 0.8);
+    transform: scale(1.1);
+  }
+
+  .like-button.liked {
+    color: hsl(0 85% 60%);
+    opacity: 1;
+  }
+
+  .like-button.liked:hover {
+    color: hsl(0 85% 50%);
+  }
+
+  .meta-item.liked {
+    color: hsl(0 85% 60%);
+  }
+
+  .meta-item.liked svg {
+    opacity: 1;
   }
 
   .empty-state {
