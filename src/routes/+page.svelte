@@ -581,8 +581,8 @@
 
   .netflix-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 2rem;
     padding: 1rem 0;
   }
 
@@ -638,12 +638,13 @@
   .netflix-card-info {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
   }
 
   .netflix-card-title {
-    font-size: 0.9375rem;
-    font-weight: 600;
+    font-size: 1.125rem;
+    font-weight: 700;
     color: hsl(var(--foreground));
     line-height: 1.3;
     margin: 0;
@@ -656,15 +657,15 @@
   .netflix-card-meta {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 1rem;
     margin-top: 0.25rem;
   }
 
   .meta-item {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
-    font-size: 0.8125rem;
+    gap: 0.375rem;
+    font-size: 0.9375rem;
     color: hsl(var(--muted-foreground));
   }
 
@@ -674,10 +675,10 @@
 
   .meta-item.episodes {
     background: hsl(var(--muted));
-    padding: 0.125rem 0.5rem;
+    padding: 0.25rem 0.625rem;
     border-radius: 4px;
     font-weight: 600;
-    font-size: 0.75rem;
+    font-size: 0.875rem;
   }
 
   .genre-badge {
@@ -809,8 +810,8 @@
 
   @media (max-width: 1200px) {
     .netflix-grid {
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 1.25rem;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1.5rem;
     }
   }
 
@@ -848,12 +849,20 @@
     }
 
     .netflix-content {
-      padding: 0 2%;
+      padding: 0 3%;
     }
 
     .netflix-grid {
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: 1rem;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .netflix-card-title {
+      font-size: 1rem;
+    }
+
+    .meta-item {
+      font-size: 0.8125rem;
     }
   }
 </style>
