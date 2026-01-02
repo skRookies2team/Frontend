@@ -1458,11 +1458,13 @@
 
       <Button
         onclick={async () => await nextStep()}
-        disabled={!canGoNext() || currentStep >= 5 || uploading || loadingAnalysis || loadingGauges || selectingGauges || configuringStory || generating}
+        disabled={!canGoNext() || currentStep >= 5 || uploading || loadingAnalysis || loadingGauges || selectingCharacters || selectingGauges || configuringStory || generating}
         size="lg"
       >
         {#if currentStep === 1}
           {uploading ? '업로드 중...' : '소설 업로드 →'}
+        {:else if currentStep === 2}
+          {selectingCharacters ? '선택 중...' : '캐릭터 선택 →'}
         {:else if currentStep === 3}
           {selectingGauges ? '선택 중...' : '게이지 선택 →'}
         {:else if currentStep === 4}
