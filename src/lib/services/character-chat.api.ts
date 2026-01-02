@@ -9,7 +9,6 @@ import { createLLMClient } from "$lib/api/llm-client"
 import { aiApi } from "$lib/api/ai-api"
 import { api } from "$lib/api"
 import { appConfig } from "$lib/config/app-config"
-import { getCharacterKnowledge } from "$lib/data/mock-knowledge"
 
 export class APICharacterChat implements ICharacterChatAPI {
   private llmClient = createLLMClient()
@@ -61,29 +60,8 @@ export class APICharacterChat implements ICharacterChatAPI {
         return response.aiMessage; // 캐릭터 이름은 포함하지 않음 (백엔드에서 처리)
       } else {
         // 직접 LLM API 호출 (기존 방식)
-        const relationship = gameState.relationships[character.id] || 0
-        const trust = gameState.trust[character.id] || 50
-        const knowledge = getCharacterKnowledge(character.id)
-
-        const prompt = this.buildPrompt(character, gameState, relationship, trust, knowledge, userQuery)
-
-        const response = await this.llmClient.chat({
-          model: "gpt-4-turbo-preview",
-          messages: [
-            {
-              role: "system",
-              content: this.getSystemPrompt(character),
-            },
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          temperature: 0.7,
-          max_tokens: 500,
-        })
-
-        return `${character.name}: ${response.content}`
+        // Note: This path is no longer used as useBackend is always true
+        throw new Error("Direct LLM API calls are not supported. Please use backend RAG API.")
       }
     } catch (error) {
       console.error("[API] Error getting character response:", error)

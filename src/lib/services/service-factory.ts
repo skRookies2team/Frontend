@@ -1,15 +1,9 @@
 /**
  * Service Factory
- * Creates service instances based on configuration (Mock vs API)
+ * Creates service instances (API implementations only)
  */
 
 import type { IStoryGeneratorAPI, ICharacterChatAPI, IImageGeneratorAPI } from "$lib/api/types/service-types"
-import { isMockMode } from "$lib/config/app-config"
-
-// Mock implementations
-import { MockStoryGenerator } from "./story-generator.mock"
-import { MockCharacterChat } from "./character-chat.mock"
-import { MockImageGenerator } from "./image-generator.mock"
 
 // API implementations
 import { APIStoryGenerator } from "./story-generator.api"
@@ -29,25 +23,19 @@ class ServiceFactory {
    */
   getStoryGenerator(): IStoryGeneratorAPI {
     if (!this.storyGeneratorInstance) {
-      this.storyGeneratorInstance = isMockMode()
-        ? new MockStoryGenerator()
-        : new APIStoryGenerator()
-      
-      console.log(`[ServiceFactory] Created ${isMockMode() ? 'Mock' : 'API'} Story Generator`)
+      this.storyGeneratorInstance = new APIStoryGenerator()
+      console.log(`[ServiceFactory] Created API Story Generator`)
     }
     return this.storyGeneratorInstance
   }
 
   /**
    * Get Character Chat instance (singleton)
-   * 항상 백엔드 API를 사용하도록 설정 (Mock 모드 비활성화)
    */
   getCharacterChat(): ICharacterChatAPI {
     if (!this.characterChatInstance) {
-      // 항상 백엔드 API 사용 (Mock 모드 비활성화)
       this.characterChatInstance = new APICharacterChat()
-      
-      console.log(`[ServiceFactory] Created API Character Chat (백엔드 연결)`)
+      console.log(`[ServiceFactory] Created API Character Chat`)
     }
     return this.characterChatInstance
   }
@@ -57,11 +45,8 @@ class ServiceFactory {
    */
   getImageGenerator(): IImageGeneratorAPI {
     if (!this.imageGeneratorInstance) {
-      this.imageGeneratorInstance = isMockMode()
-        ? new MockImageGenerator()
-        : new APIImageGenerator()
-      
-      console.log(`[ServiceFactory] Created ${isMockMode() ? 'Mock' : 'API'} Image Generator`)
+      this.imageGeneratorInstance = new APIImageGenerator()
+      console.log(`[ServiceFactory] Created API Image Generator`)
     }
     return this.imageGeneratorInstance
   }

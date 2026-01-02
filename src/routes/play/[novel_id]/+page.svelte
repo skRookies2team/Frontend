@@ -1,8 +1,6 @@
 <script lang="ts">
   import { gsm } from '$lib/stores/game-state-manager.svelte';
   import { bgmManager } from '$lib/stores/bgm-manager.svelte';
-  import { novels } from '$lib/data/novel-configs';
-  import { storyGenerator } from '$lib/services/story-generator';
   import { characterChat } from '$lib/services/character-chat';
   import { saveGameState, loadGameState, clearGameState, hasSavedGame } from '$lib/utils/storage';
   import { getAccessibleImageUrl } from '$lib/utils/image-url';
@@ -25,7 +23,6 @@
   const novelId = $derived($page.params.novel_id);
   let novelConfig = $state<NovelConfig | null>(null);
   let storyData = $state<StoryData | null>(null);
-  let useApiGame = $state(false);
   
   let loading = $state(false); // 게임 장면 로딩용
   let chatLoading = $state(false); // NPC 대화 전송 로딩용 (장면에 영향 없음)
@@ -56,31 +53,15 @@
   
   onMount(async () => {
     loading = true;
-    
-    // 먼저 하드코딩된 novels 배열에서 찾기
-    const localNovel = novels.find(n => n.id === novelId);
-    
-    if (localNovel) {
-      // 하드코딩된 소설이 있으면 기존 방식 사용
-      novelConfig = localNovel;
-      gsm.initializeGame(novelConfig);
-      
-      const firstScene = await storyGenerator.generateScene(
-        gsm.currentState,
-        novelConfig.description
-      );
-      gsm.setScene(firstScene);
-      
-      gameInitialized = true;
-    } else {
-      // 하드코딩된 소설이 없으면 API에서 가져오기
-      try {
-        const storyId = parseInt(novelId);
-        if (isNaN(storyId)) {
-          console.error('Invalid story ID:', novelId);
-          window.location.href = '/';
-          return;
-        }
+
+    // API에서 스토리 정보 가져오기
+    try {
+      const storyId = parseInt(novelId);
+      if (isNaN(storyId)) {
+        console.error('Invalid story ID:', novelId);
+        window.location.href = '/';
+        return;
+      }
         
         // 모든 스토리 목록에서 해당 ID 찾기
         const allStories = await api.game.getAllStories();
@@ -205,23 +186,21 @@
             immediateReaction: c.immediateReaction
           }))
         };
-        
+
         gsm.setScene(apiScene);
-        useApiGame = true;
         gameInitialized = true;
 
         // BGM 재생
         if (gameStateResponse.bgm && gameStateResponse.currentEpisodeId) {
           bgmManager.play(gameStateResponse.bgm, gameStateResponse.currentEpisodeId);
         }
-      } catch (err) {
-        console.error('Failed to load story from API:', err);
-        alert('게임을 불러오는데 실패했습니다.');
-        window.location.href = '/';
-        return;
-      }
+    } catch (err) {
+      console.error('Failed to load story from API:', err);
+      alert('게임을 불러오는데 실패했습니다.');
+      window.location.href = '/';
+      return;
     }
-    
+
     loading = false;
   });
 
@@ -235,10 +214,10 @@
     if (!gameState.currentScene || !novelConfig) return;
     
     const choice = gameState.currentScene.choices.find((c: any) => c.id === choiceId);
-    
+
     if (choice) {
-      if (useApiGame && sessionId) {
-        // API 게임 사용 시
+      if (sessionId) {
+        // API 게임 사용
         try {
           // 특수 선택지 처리 (에피소드 계속하기, 재시작 등)
           if (choiceId === 'continue') {
@@ -454,19 +433,12 @@
           alert('선택지 처리에 실패했습니다.');
         }
       } else {
-        // 기존 방식 (하드코딩된 소설)
-        gsm.processChoice(choice);
-        saveGameState(gsm.currentState);
-        
-        const nextScene = await storyGenerator.generateScene(
-          gsm.currentState,
-          novelConfig.description,
-          choice
-        );
-        gsm.setScene(nextScene);
+        console.error('No session ID - game not initialized properly');
+        alert('게임 세션이 초기화되지 않았습니다. 다시 시작해주세요.');
+        window.location.href = '/';
       }
     }
-    
+
     loading = false;
   }
   

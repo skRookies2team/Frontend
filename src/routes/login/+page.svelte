@@ -52,11 +52,6 @@
       loading = false;
     }
   }
-  
-  function handleSocialLogin(provider: string) {
-    console.log('Social login:', provider);
-    alert(`${provider} 로그인 기능은 준비 중입니다!`);
-  }
 </script>
 
 <div class="login-page">
@@ -184,39 +179,6 @@
             {loading ? '처리중...' : isSignUp ? '회원가입' : '로그인'}
           </Button>
         </form>
-
-        <!-- Divider -->
-        <div class="divider">
-          <span>또는</span>
-        </div>
-
-        <!-- Social Login -->
-        <div class="social-login">
-          <button 
-            type="button" 
-            class="social-btn kakao"
-            onclick={() => handleSocialLogin('Kakao')}
-          >
-            <span class="social-icon">💬</span>
-            <span>카카오로 시작하기</span>
-          </button>
-          <button 
-            type="button" 
-            class="social-btn google"
-            onclick={() => handleSocialLogin('Google')}
-          >
-            <span class="social-icon">G</span>
-            <span>Google로 시작하기</span>
-          </button>
-          <button 
-            type="button" 
-            class="social-btn github"
-            onclick={() => handleSocialLogin('GitHub')}
-          >
-            <span class="social-icon">🐙</span>
-            <span>GitHub로 시작하기</span>
-          </button>
-        </div>
 
         <!-- Footer -->
         <div class="form-footer">
@@ -417,68 +379,6 @@
 
   .link-btn:hover {
     color: hsl(var(--primary) / 0.8);
-  }
-
-  .divider {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin: 2rem 0;
-    color: hsl(var(--muted-foreground));
-    font-size: 0.875rem;
-  }
-
-  .divider::before,
-  .divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: hsl(var(--border));
-  }
-
-  .social-login {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .social-btn {
-    width: 100%;
-    padding: 0.75rem 1rem;
-    border: 1px solid hsl(var(--border));
-    border-radius: var(--radius-md);
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    transition: all 0.2s;
-  }
-
-  .social-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-
-  .social-btn.kakao {
-    background: #fee500;
-    color: #000000;
-  }
-
-  .social-btn.google {
-    background: white;
-    color: #000000;
-  }
-
-  .social-btn.github {
-    background: #24292e;
-    color: white;
-  }
-
-  .social-icon {
-    font-size: 1.25rem;
   }
 
   .form-footer {
