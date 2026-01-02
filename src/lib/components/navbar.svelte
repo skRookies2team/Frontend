@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { api } from '$lib/api';
-  import { isAuthenticated, user } from '$lib/stores/auth';
+  import { isAuthenticated, user, isLoading } from '$lib/stores/auth';
 
   let searchQuery = $state('');
 
@@ -66,26 +66,28 @@
         </button>
       </div>
       
-      {#if $isAuthenticated && $user}
-        <!-- 로그인 상태 -->
-        <div class="user-info">
-          <span class="username">{$user.username}</span>
-        </div>
-        <Button variant="outline" size="sm" onclick={handleLogout} aria-label="로그아웃">
-          로그아웃
-        </Button>
-        <button type="button" class="profile-btn" onclick={() => window.location.href = '/profile'} aria-label="프로필">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-            <circle cx="12" cy="10" r="3" fill="currentColor"/>
-            <path d="M6.5 18.5c1-2 3-3.5 5.5-3.5s4.5 1.5 5.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-        </button>
-      {:else}
-        <!-- 로그인 안 된 상태 -->
-        <Button variant="default" size="sm" onclick={() => window.location.href = '/login'} aria-label="로그인">
-          로그인
-        </Button>
+      {#if !$isLoading}
+        {#if $isAuthenticated && $user}
+          <!-- 로그인 상태 -->
+          <div class="user-info">
+            <span class="username">{$user.username}</span>
+          </div>
+          <Button variant="outline" size="sm" onclick={handleLogout} aria-label="로그아웃">
+            로그아웃
+          </Button>
+          <button type="button" class="profile-btn" onclick={() => window.location.href = '/profile'} aria-label="프로필">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+              <circle cx="12" cy="10" r="3" fill="currentColor"/>
+              <path d="M6.5 18.5c1-2 3-3.5 5.5-3.5s4.5 1.5 5.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        {:else}
+          <!-- 로그인 안 된 상태 -->
+          <Button variant="default" size="sm" onclick={() => window.location.href = '/login'} aria-label="로그인">
+            로그인
+          </Button>
+        {/if}
       {/if}
     </div>
   </div>

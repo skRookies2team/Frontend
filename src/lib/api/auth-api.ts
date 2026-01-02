@@ -134,24 +134,9 @@ export class AuthApi {
    */
   isAuthenticated(): boolean {
     if (!browser) return false;
-    // Check both store and cookie for reliability
+    // Check cookie for authentication status
     const token = getCookie('accessToken');
-    if (token) {
-      // If token exists in cookie but not in store, sync it
-      const userId = getCookie('userId');
-      const username = getCookie('username');
-      const refreshToken = getCookie('refreshToken');
-      if (userId && username) {
-        authStore.setUser({
-          userId: parseInt(userId, 10),
-          username,
-          accessToken: token,
-          refreshToken: refreshToken || null
-        });
-      }
-      return true;
-    }
-    return false;
+    return !!token;
   }
 
   /**
