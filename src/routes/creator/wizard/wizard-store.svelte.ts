@@ -358,6 +358,11 @@ class WizardStore {
     console.log('uploadedFile:', this.uploadedFile);
     console.log('novelText length:', this.novelText.length);
 
+    // 더블클릭 방지: 이미 업로드 중이면 리턴
+    if (this.uploading) {
+      return;
+    }
+
     if (!this.canGoNext()) {
       alert('제목과 소설 파일을 입력해주세요');
       return;
@@ -560,6 +565,11 @@ class WizardStore {
   }
 
   async submitCharacterSelection() {
+    // 더블클릭 방지: 이미 처리 중이면 리턴
+    if (this.selectingCharacters) {
+      return;
+    }
+
     if (this.selectedCharacterNames.length < 1 || this.selectedCharacterNames.length > 2) {
       alert('NPC로 만들 캐릭터를 1~2명 선택해주세요.');
       return;
@@ -611,6 +621,11 @@ class WizardStore {
   }
 
   async submitGaugeSelection() {
+    // 더블클릭 방지: 이미 처리 중이면 리턴
+    if (this.selectingGauges) {
+      return;
+    }
+
     if (this.selectedGaugeIds.length !== 2) {
       alert('게이지를 정확히 2개 선택해주세요.');
       return;
@@ -640,6 +655,11 @@ class WizardStore {
   // ===== 4단계: 설정 제출 & 생성 시작 =====
 
   async submitConfig() {
+    // 더블클릭 방지: 이미 처리 중이면 리턴
+    if (this.configuringStory || this.generating) {
+      return;
+    }
+
     this.configuringStory = true;
     this.generating = true;
     this.error = '';
@@ -716,6 +736,11 @@ class WizardStore {
     newImageUrl?: string;
   }>) {
     if (!this.selectedNode || !this.currentEpisodeTree) return;
+
+    // 더블클릭 방지: 이미 재생성 중이면 리턴
+    if (this.regenerating) {
+      return;
+    }
 
     const { nodeId, newText, newChoices, newImagePrompt, newImageUrl } = event.detail;
 
@@ -921,6 +946,11 @@ class WizardStore {
   }
 
   async generateNextEpisodeFromTree() {
+    // 더블클릭 방지: 이미 생성 중이면 리턴
+    if (this.generating) {
+      return;
+    }
+
     // 현재 에피소드 완료 처리
     this.totalEpisodesGenerated = this.currentEpisode;
 
