@@ -69,7 +69,7 @@ class WizardStore {
     open: 1,
     bad: 0
   });
-  numEpisodes = $state(5);
+  numEpisodes = $state(5); // 프론트엔드 기본값 (백엔드에서 실제 에피소드 수 결정)
   maxDepth = $state(3);
   numEpisodeEndings = $state(3);
   configuringStory = $state(false);
@@ -660,20 +660,23 @@ class WizardStore {
     this.error = '';
     this.currentEpisode = 1;
     this.totalEpisodesGenerated = 0;
-    this.actualTotalEpisodes = this.numEpisodes;
     this.currentStep = 5;
     this.progressMessage = '에피소드 1 생성 중... (약 1-2분 소요)';
     this.saveState();
 
     try {
       // 설정 저장
-      await api.story.configureStory(this.storyId, {
+      const configResponse = await api.story.configureStory(this.storyId, {
         description: this.description,
         numEpisodes: this.numEpisodes,
         maxDepth: this.maxDepth,
         endingConfig: this.endingConfig,
         numEpisodeEndings: this.numEpisodeEndings
       });
+
+      // 백엔드에서 반환된 실제 에피소드 수를 사용
+      this.actualTotalEpisodes = configResponse.config.numEpisodes;
+      this.saveState();
 
       // 에피소드 1 생성 (동기 - 완료될 때까지 대기)
       console.log('EP1 생성 시작 (동기 방식)...');
@@ -1180,7 +1183,7 @@ class WizardStore {
     this.proposedGauges = [];
     this.selectedGaugeIds = [];
     this.endingConfig = { happy: 2, tragic: 1, neutral: 1, open: 1, bad: 0 };
-    this.numEpisodes = 5;
+    this.numEpisodes = 5; // 프론트엔드 기본값 (백엔드에서 실제 에피소드 수 결정)
     this.maxDepth = 3;
     this.numEpisodeEndings = 3;
     this.storyDataId = null;
