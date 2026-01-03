@@ -1596,5 +1596,72 @@
       grid-template-columns: repeat(2, 1fr);
     }
   }
+
+  /* Loading State (Step3) */
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 3rem;
+  }
+
+  .loading-state p {
+    font-size: 1rem;
+    color: hsl(var(--muted-foreground));
+    text-align: center;
+  }
+
+  /* Gauge Range (Step3) */
+  .gauge-range {
+    font-size: 0.75rem;
+    color: hsl(var(--primary));
+    margin-top: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    background: hsl(var(--primary) / 0.1);
+    border-radius: var(--radius-sm);
+    display: inline-block;
+  }
+
+  /* Info Card (Step4) */
+  .info-card {
+    padding: 1.5rem;
+    background: hsl(var(--muted) / 0.2);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-md);
+  }
+
+  .info-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+    margin: 0 0 1rem 0;
+  }
+
+  .info-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .info-list li {
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .info-list li strong {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+  }
+
+  /* Required field indicator */
+  .required {
+    color: hsl(0 84.2% 60.2%);
+  }
 </style>
 </svelte:head>

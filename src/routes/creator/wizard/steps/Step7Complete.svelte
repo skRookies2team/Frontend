@@ -13,33 +13,33 @@
   </div>
   <div class="card-body">
     {#if metadata && storyDataId}
-      <div class="success-state">
-        <div class="success-icon">✨</div>
-        <h3 class="success-title">{metadata.title}</h3>
+      <div class="complete-card">
+        <div class="complete-icon">✨</div>
+        <h3 class="complete-title">{metadata.title}</h3>
         {#if metadata.description}
-          <p class="success-desc">{metadata.description}</p>
+          <p class="complete-desc">{metadata.description}</p>
         {/if}
-        
-        <div class="story-stats">
-          <div class="stat-item">
-            <span class="stat-label">총 에피소드</span>
-            <span class="stat-value">{metadata.totalEpisodes}화</span>
+
+        <div class="metadata-card">
+          <div class="metadata-row">
+            <span class="metadata-label">총 에피소드</span>
+            <span class="metadata-value">{metadata.totalEpisodes}화</span>
           </div>
-          <div class="stat-item">
-            <span class="stat-label">총 노드</span>
-            <span class="stat-value">{metadata.totalNodes}개</span>
+          <div class="metadata-row">
+            <span class="metadata-label">총 노드</span>
+            <span class="metadata-value">{metadata.totalNodes}개</span>
           </div>
-          <div class="stat-item">
-            <span class="stat-label">게이지 수</span>
-            <span class="stat-value">{metadata.totalGauges}개</span>
+          <div class="metadata-row">
+            <span class="metadata-label">게이지 수</span>
+            <span class="metadata-value">{metadata.totalGauges}개</span>
           </div>
-          <div class="stat-item">
-            <span class="stat-label">생성일</span>
-            <span class="stat-value">{new Date(metadata.createdAt).toLocaleDateString('ko-KR')}</span>
+          <div class="metadata-row">
+            <span class="metadata-label">생성일</span>
+            <span class="metadata-value">{new Date(metadata.createdAt).toLocaleDateString('ko-KR')}</span>
           </div>
         </div>
 
-        <div class="action-buttons">
+        <div class="complete-actions">
           <Button size="lg" onclick={startPlaying}>
             🎮 지금 플레이하기
           </Button>
