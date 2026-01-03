@@ -97,32 +97,8 @@ class WizardStore {
   private readonly STORAGE_KEY = 'wizard-state';
 
   constructor() {
-    // 상태 변경 감지 및 저장 - 모든 상태 변수 추적
-    $effect(() => {
-      // 모든 상태를 추적
-      const _ = this.currentStep;
-      const __ = this.storyId;
-      const ___ = this.title;
-      const ____ = this.description;
-      const _____ = this.summary;
-      const ______ = this.characters.length;
-      const _______ = this.selectedGaugeIds.length;
-      const ________ = this.numEpisodes;
-      const _________ = this.maxDepth;
-      const __________ = this.currentEpisode;
-      const ___________ = this.storyDataId;
-      // 트리 편집 관련 상태 추적
-      const ____________ = this.treeEditMode;
-      const _____________ = this.currentEpisodeTree;
-      const ______________ = this.proposedGauges.length;
-
-      // 약간의 지연 후 저장 (성능 최적화)
-      const timeoutId = setTimeout(() => {
-        this.saveState();
-      }, 100);
-
-      return () => clearTimeout(timeoutId);
-    });
+    // $effect는 컴포넌트 컨텍스트에서만 동작하므로 제거
+    // 대신 각 상태 변경 함수에서 명시적으로 saveState() 호출
   }
 
   // ===== 상태 관리 함수들 =====
@@ -287,18 +263,22 @@ class WizardStore {
 
   setTitleValue = (value: string) => {
     this.title = value;
+    this.saveState();
   }
 
   setDescriptionValue = (value: string) => {
     this.description = value;
+    this.saveState();
   }
 
   setGenreValue = (value: string) => {
     this.genre = value;
+    this.saveState();
   }
 
   clearUploadedFile = () => {
     this.uploadedFile = null;
+    this.saveState();
   }
 
   toggleGauge = (gaugeId: string) => {
@@ -310,6 +290,7 @@ class WizardStore {
       // 이미 2개 선택됨: 첫 번째를 제거하고 새로운 것 추가
       this.selectedGaugeIds = [this.selectedGaugeIds[1], gaugeId];
     }
+    this.saveState();
   }
 
   toggleCharacter = (name: string) => {
@@ -320,6 +301,7 @@ class WizardStore {
       next.add(name);
     }
     this.expandedCharacters = next;
+    // expandedCharacters는 UI 상태이므로 저장하지 않음
   }
 
   toggleCharacterSelection = (name: string) => {
@@ -331,22 +313,27 @@ class WizardStore {
       // 이미 2개 선택됨: 첫 번째를 제거하고 새로운 것 추가
       this.selectedCharacterNames = [this.selectedCharacterNames[1], name];
     }
+    this.saveState();
   }
 
   handleEndingChange = (key: string, value: number) => {
     this.endingConfig = { ...this.endingConfig, [key]: value };
+    this.saveState();
   }
 
   handleNumEpisodesChange = (value: number) => {
     this.numEpisodes = value;
+    this.saveState();
   }
 
   handleMaxDepthChange = (value: number) => {
     this.maxDepth = value;
+    this.saveState();
   }
 
   handleNumEpisodeEndingsChange = (value: number) => {
     this.numEpisodeEndings = value;
+    this.saveState();
   }
 
   // ===== 1단계: 소설 업로드 =====
@@ -407,6 +394,7 @@ class WizardStore {
 
       this.storyId = response.storyId;
       this.currentStep = 2;
+      this.saveState();
 
       // 2단계로 이동 후 자동으로 분석 데이터 로드
       this.loadAnalysisData();
@@ -457,6 +445,7 @@ class WizardStore {
         this.title = file.name.replace(/\.(txt|pdf|doc|docx)$/i, '');
       }
 
+      this.saveState();
       console.log('파일 선택됨:', file.name, `(${(file.size / 1024).toFixed(1)} KB)`);
     } catch (err) {
       console.error('파일 처리 실패:', err);
@@ -485,6 +474,7 @@ class WizardStore {
           this.summary = summaryData.summary;
           this.characters = charactersData.characters;
           this.loadingAnalysis = false;
+          this.saveState();
 
           // 썸네일 조회 (분석 완료 후 비동기로 조회)
           this.loadThumbnail();
@@ -512,6 +502,7 @@ class WizardStore {
       const response = await api.story.getThumbnail(this.storyId);
       this.thumbnailUrl = response.thumbnailUrl || '';
       this.hasAiGenerated = response.hasAiGenerated || false;
+      this.saveState();
     } catch (err: any) {
       // 썸네일이 없는 경우는 에러로 처리하지 않음
       console.log('썸네일 조회:', err.message || '썸네일 없음');
@@ -545,6 +536,7 @@ class WizardStore {
       // 4. 상태 업데이트
       this.thumbnailUrl = response.thumbnailUrl;
       this.hasAiGenerated = false; // 사용자 업로드이므로 false
+      this.saveState();
       console.log('썸네일 업로드 성공:', response.message);
     } catch (err: any) {
       console.error('썸네일 업로드 실패:', err);
@@ -585,6 +577,7 @@ class WizardStore {
 
       // 3단계로 이동 후 게이지 로드
       this.currentStep = 3;
+      this.saveState();
       await this.loadGauges();
     } catch (err: any) {
       console.error('캐릭터 선택 실패:', err);
@@ -608,6 +601,7 @@ class WizardStore {
     try {
       const response = await api.story.getGauges(this.storyId);
       this.proposedGauges = response.gauges;
+      this.saveState();
     } catch (err: any) {
       console.error('게이지 로드 실패:', err);
       if (err instanceof ApiError) {
@@ -640,6 +634,7 @@ class WizardStore {
       });
 
       this.currentStep = 4;
+      this.saveState();
     } catch (err: any) {
       console.error('게이지 선택 실패:', err);
       if (err instanceof ApiError) {
@@ -668,6 +663,7 @@ class WizardStore {
     this.actualTotalEpisodes = this.numEpisodes;
     this.currentStep = 5;
     this.progressMessage = '에피소드 1 생성 중... (약 1-2분 소요)';
+    this.saveState();
 
     try {
       // 설정 저장
@@ -966,6 +962,7 @@ class WizardStore {
     this.error = '';
     this.currentEpisode++;
     this.progressMessage = `에피소드 ${this.currentEpisode}/${this.actualTotalEpisodes} 생성 중... (약 1-2분 소요)`;
+    this.saveState();
 
     try {
       // 다음 에피소드 생성 (동기 - 완료될 때까지 대기)
@@ -1035,6 +1032,7 @@ class WizardStore {
     this.currentStep = 5;
     this.generating = false;
     this.selectedNode = null;
+    this.saveState();
 
     console.log('트리 편집 모드 설정 완료:', {
       title: this.currentEpisodeTitle,
@@ -1072,6 +1070,7 @@ class WizardStore {
 
         this.currentStep = 7;
         this.generating = false;
+        this.saveState();
 
         alert('🎉 스토리 생성이 완료되었습니다!');
 
@@ -1152,6 +1151,7 @@ class WizardStore {
       } else if (this.canGoNext()) {
         console.log('일반 다음 단계');
         this.currentStep++;
+        this.saveState();
       }
     } catch (error) {
       console.error('nextStep 에러:', error);
@@ -1162,6 +1162,7 @@ class WizardStore {
   prevStep = () => {
     if (this.currentStep > 1) {
       this.currentStep--;
+      this.saveState();
     }
   }
 
@@ -1196,6 +1197,7 @@ class WizardStore {
     this.selectedNode = null;
     this.regenerating = false;
     this.treeEditMode = false;
+    this.saveState();
   }
 }
 
