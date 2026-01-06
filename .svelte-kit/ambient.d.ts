@@ -26,36 +26,47 @@
  * ```
  */
 declare module '$env/static/private' {
+	export const ACLOCAL_PATH: string;
 	export const ALLUSERSPROFILE: string;
 	export const APPDATA: string;
-	export const ChocolateyInstall: string;
-	export const ChocolateyLastPathUpdate: string;
-	export const CHROME_CRASHPAD_PIPE_NAME: string;
-	export const CLAUDE_CODE_SSE_PORT: string;
 	export const COLOR: string;
-	export const COLORTERM: string;
-	export const CommonProgramFiles: string;
+	export const COMMONPROGRAMFILES: string;
 	export const CommonProgramW6432: string;
 	export const COMPUTERNAME: string;
-	export const ComSpec: string;
+	export const COMSPEC: string;
 	export const configsetroot: string;
-	export const CURSOR_TRACE_ID: string;
+	export const CONFIG_SITE: string;
+	export const DISPLAY: string;
 	export const DriverData: string;
 	export const EDITOR: string;
-	export const ENABLE_IDE_INTEGRATION: string;
-	export const GIT_ASKPASS: string;
+	export const EFC_5368_1262719628: string;
+	export const EFC_5368_1592913036: string;
+	export const EFC_5368_2283032206: string;
+	export const EFC_5368_2775293581: string;
+	export const EFC_5368_3789132940: string;
+	export const EXEPATH: string;
+	export const FPS_BROWSER_APP_PROFILE_STRING: string;
+	export const FPS_BROWSER_USER_PROFILE_STRING: string;
 	export const HOME: string;
 	export const HOMEDRIVE: string;
 	export const HOMEPATH: string;
+	export const HOSTNAME: string;
+	export const INFOPATH: string;
 	export const INIT_CWD: string;
 	export const JAVA_HOME: string;
 	export const LANG: string;
 	export const LOCALAPPDATA: string;
 	export const LOGONSERVER: string;
+	export const MANPATH: string;
+	export const MINGW_CHOST: string;
+	export const MINGW_PACKAGE_PREFIX: string;
+	export const MINGW_PREFIX: string;
+	export const MSYSTEM: string;
+	export const MSYSTEM_CARCH: string;
+	export const MSYSTEM_CHOST: string;
+	export const MSYSTEM_PREFIX: string;
 	export const NODE: string;
 	export const NODE_ENV: string;
-	export const NODE_EXE: string;
-	export const NPM_CLI_JS: string;
 	export const npm_command: string;
 	export const npm_config_cache: string;
 	export const npm_config_globalconfig: string;
@@ -75,42 +86,47 @@ declare module '$env/static/private' {
 	export const npm_package_json: string;
 	export const npm_package_name: string;
 	export const npm_package_version: string;
-	export const NPM_PREFIX_JS: string;
-	export const NPM_PREFIX_NPM_CLI_JS: string;
 	export const NUMBER_OF_PROCESSORS: string;
+	export const OLDPWD: string;
 	export const OneDrive: string;
-	export const OneDriveConsumer: string;
-	export const ORIGINAL_XDG_CURRENT_DESKTOP: string;
+	export const ORIGINAL_PATH: string;
+	export const ORIGINAL_TEMP: string;
+	export const ORIGINAL_TMP: string;
 	export const OS: string;
-	export const Path: string;
+	export const PATH: string;
 	export const PATHEXT: string;
+	export const PKG_CONFIG_PATH: string;
+	export const PKG_CONFIG_SYSTEM_INCLUDE_PATH: string;
+	export const PKG_CONFIG_SYSTEM_LIBRARY_PATH: string;
+	export const PLINK_PROTOCOL: string;
 	export const PROCESSOR_ARCHITECTURE: string;
 	export const PROCESSOR_IDENTIFIER: string;
 	export const PROCESSOR_LEVEL: string;
 	export const PROCESSOR_REVISION: string;
 	export const ProgramData: string;
-	export const ProgramFiles: string;
+	export const PROGRAMFILES: string;
 	export const ProgramW6432: string;
 	export const PROMPT: string;
 	export const PSModulePath: string;
 	export const PUBLIC: string;
-	export const SystemDrive: string;
-	export const SystemRoot: string;
+	export const PWD: string;
+	export const SESSIONNAME: string;
+	export const SHELL: string;
+	export const SHLVL: string;
+	export const SSH_ASKPASS: string;
+	export const SYSTEMDRIVE: string;
+	export const SYSTEMROOT: string;
 	export const TEMP: string;
-	export const TERM_PROGRAM: string;
-	export const TERM_PROGRAM_VERSION: string;
+	export const TERM: string;
 	export const TMP: string;
+	export const TMPDIR: string;
 	export const USERDOMAIN: string;
 	export const USERDOMAIN_ROAMINGPROFILE: string;
 	export const USERNAME: string;
 	export const USERPROFILE: string;
-	export const VSCODE_GIT_ASKPASS_EXTRA_ARGS: string;
-	export const VSCODE_GIT_ASKPASS_MAIN: string;
-	export const VSCODE_GIT_ASKPASS_NODE: string;
-	export const VSCODE_GIT_IPC_HANDLE: string;
-	export const VSCODE_NONCE: string;
-	export const windir: string;
+	export const WINDIR: string;
 	export const ZES_ENABLE_SYSMAN: string;
+	export const _: string;
 }
 
 /**
@@ -123,7 +139,9 @@ declare module '$env/static/private' {
  * ```
  */
 declare module '$env/static/public' {
-	
+	export const PUBLIC_API_BASE_URL: string;
+	export const PUBLIC_RELAY_API_URL: string;
+	export const PUBLIC_API_MODE: string;
 }
 
 /**
@@ -140,36 +158,47 @@ declare module '$env/static/public' {
  */
 declare module '$env/dynamic/private' {
 	export const env: {
+		ACLOCAL_PATH: string;
 		ALLUSERSPROFILE: string;
 		APPDATA: string;
-		ChocolateyInstall: string;
-		ChocolateyLastPathUpdate: string;
-		CHROME_CRASHPAD_PIPE_NAME: string;
-		CLAUDE_CODE_SSE_PORT: string;
 		COLOR: string;
-		COLORTERM: string;
-		CommonProgramFiles: string;
+		COMMONPROGRAMFILES: string;
 		CommonProgramW6432: string;
 		COMPUTERNAME: string;
-		ComSpec: string;
+		COMSPEC: string;
 		configsetroot: string;
-		CURSOR_TRACE_ID: string;
+		CONFIG_SITE: string;
+		DISPLAY: string;
 		DriverData: string;
 		EDITOR: string;
-		ENABLE_IDE_INTEGRATION: string;
-		GIT_ASKPASS: string;
+		EFC_5368_1262719628: string;
+		EFC_5368_1592913036: string;
+		EFC_5368_2283032206: string;
+		EFC_5368_2775293581: string;
+		EFC_5368_3789132940: string;
+		EXEPATH: string;
+		FPS_BROWSER_APP_PROFILE_STRING: string;
+		FPS_BROWSER_USER_PROFILE_STRING: string;
 		HOME: string;
 		HOMEDRIVE: string;
 		HOMEPATH: string;
+		HOSTNAME: string;
+		INFOPATH: string;
 		INIT_CWD: string;
 		JAVA_HOME: string;
 		LANG: string;
 		LOCALAPPDATA: string;
 		LOGONSERVER: string;
+		MANPATH: string;
+		MINGW_CHOST: string;
+		MINGW_PACKAGE_PREFIX: string;
+		MINGW_PREFIX: string;
+		MSYSTEM: string;
+		MSYSTEM_CARCH: string;
+		MSYSTEM_CHOST: string;
+		MSYSTEM_PREFIX: string;
 		NODE: string;
 		NODE_ENV: string;
-		NODE_EXE: string;
-		NPM_CLI_JS: string;
 		npm_command: string;
 		npm_config_cache: string;
 		npm_config_globalconfig: string;
@@ -189,42 +218,47 @@ declare module '$env/dynamic/private' {
 		npm_package_json: string;
 		npm_package_name: string;
 		npm_package_version: string;
-		NPM_PREFIX_JS: string;
-		NPM_PREFIX_NPM_CLI_JS: string;
 		NUMBER_OF_PROCESSORS: string;
+		OLDPWD: string;
 		OneDrive: string;
-		OneDriveConsumer: string;
-		ORIGINAL_XDG_CURRENT_DESKTOP: string;
+		ORIGINAL_PATH: string;
+		ORIGINAL_TEMP: string;
+		ORIGINAL_TMP: string;
 		OS: string;
-		Path: string;
+		PATH: string;
 		PATHEXT: string;
+		PKG_CONFIG_PATH: string;
+		PKG_CONFIG_SYSTEM_INCLUDE_PATH: string;
+		PKG_CONFIG_SYSTEM_LIBRARY_PATH: string;
+		PLINK_PROTOCOL: string;
 		PROCESSOR_ARCHITECTURE: string;
 		PROCESSOR_IDENTIFIER: string;
 		PROCESSOR_LEVEL: string;
 		PROCESSOR_REVISION: string;
 		ProgramData: string;
-		ProgramFiles: string;
+		PROGRAMFILES: string;
 		ProgramW6432: string;
 		PROMPT: string;
 		PSModulePath: string;
 		PUBLIC: string;
-		SystemDrive: string;
-		SystemRoot: string;
+		PWD: string;
+		SESSIONNAME: string;
+		SHELL: string;
+		SHLVL: string;
+		SSH_ASKPASS: string;
+		SYSTEMDRIVE: string;
+		SYSTEMROOT: string;
 		TEMP: string;
-		TERM_PROGRAM: string;
-		TERM_PROGRAM_VERSION: string;
+		TERM: string;
 		TMP: string;
+		TMPDIR: string;
 		USERDOMAIN: string;
 		USERDOMAIN_ROAMINGPROFILE: string;
 		USERNAME: string;
 		USERPROFILE: string;
-		VSCODE_GIT_ASKPASS_EXTRA_ARGS: string;
-		VSCODE_GIT_ASKPASS_MAIN: string;
-		VSCODE_GIT_ASKPASS_NODE: string;
-		VSCODE_GIT_IPC_HANDLE: string;
-		VSCODE_NONCE: string;
-		windir: string;
+		WINDIR: string;
 		ZES_ENABLE_SYSMAN: string;
+		_: string;
 		[key: `PUBLIC_${string}`]: undefined;
 		[key: `${string}`]: string | undefined;
 	}
@@ -242,6 +276,9 @@ declare module '$env/dynamic/private' {
  */
 declare module '$env/dynamic/public' {
 	export const env: {
+		PUBLIC_API_BASE_URL: string;
+		PUBLIC_RELAY_API_URL: string;
+		PUBLIC_API_MODE: string;
 		[key: `PUBLIC_${string}`]: string | undefined;
 	}
 }

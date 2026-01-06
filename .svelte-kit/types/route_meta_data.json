@@ -1,11 +1,30 @@
 {
-	"/": [],
-	"/community": [],
-	"/community/[postId]": [],
-	"/creator": [],
-	"/creator/wizard": [],
-	"/login": [],
-	"/play/[novel_id]": [],
-	"/profile": [],
-	"/search": []
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.ts"
+	],
+	"/community": [
+		"src/routes/+layout.ts"
+	],
+	"/community/[postId]": [
+		"src/routes/+layout.ts"
+	],
+	"/creator": [
+		"src/routes/+layout.ts"
+	],
+	"/creator/wizard": [
+		"src/routes/+layout.ts"
+	],
+	"/login": [
+		"src/routes/+layout.ts"
+	],
+	"/play/[novel_id]": [
+		"src/routes/+layout.ts"
+	],
+	"/profile": [
+		"src/routes/+layout.ts"
+	],
+	"/search": [
+		"src/routes/+layout.ts"
+	]
 }

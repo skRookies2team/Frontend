@@ -1,1 +1,1 @@
-export const env={}
+export const env={"PUBLIC_API_BASE_URL":"http://43.202.142.50:8080/api","PUBLIC_RELAY_API_URL":"http://43.202.142.50:8080/relay","PUBLIC_API_MODE":"production"}
